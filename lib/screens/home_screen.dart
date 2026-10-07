@@ -21,11 +21,11 @@ import 'chat_data_screen.dart';
 import 'chat_groupings_screen.dart';
 import 'check_screen.dart';
 import 'generate_screen.dart';
+import 'graph_screen.dart';
 import 'openers_screen.dart';
 import 'search_screen.dart';
 import 'settings_screen.dart';
 import 'train_screen.dart';
-import 'trends_screen.dart';
 
 /// What the app knows, which of it to use, and the things you can do.
 class HomeScreen extends ConsumerStatefulWidget {
@@ -557,10 +557,10 @@ class _Explore extends StatelessWidget {
         onTap: () => open(const CheckScreen()),
       ),
       _Tile(
-        icon: Icons.trending_up_rounded,
-        title: 'How it’s going',
-        subtitle: 'Warming up or cooling off',
-        onTap: () => open(const TrendsScreen()),
+        icon: Icons.bar_chart_rounded,
+        title: 'Make a graph',
+        subtitle: 'Describe it, get it',
+        onTap: () => open(const GraphScreen()),
       ),
       _Tile(
         icon: Icons.search_rounded,

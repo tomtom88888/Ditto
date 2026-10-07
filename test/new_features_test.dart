@@ -8,10 +8,10 @@ import 'package:replylikeme/models/style_profile.dart';
 import 'package:replylikeme/screens/ask_screen.dart';
 import 'package:replylikeme/screens/check_screen.dart';
 import 'package:replylikeme/screens/openers_screen.dart';
-import 'package:replylikeme/screens/trends_screen.dart';
+import 'package:replylikeme/screens/graph_screen.dart';
 import 'package:replylikeme/services/ask_chats.dart';
 import 'package:replylikeme/services/chat_search.dart';
-import 'package:replylikeme/services/chat_trends.dart';
+import 'package:replylikeme/services/chart_maker.dart';
 import 'package:replylikeme/services/memory_exchange_store.dart';
 import 'package:replylikeme/services/message_check.dart';
 import 'package:replylikeme/services/openai_service.dart';
@@ -70,56 +70,105 @@ List<StoredExchange> month(
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
 
-  group('ChatTrends', () {
-    test('counts each month, both sides, from the stored lead-ups', () {
-      final t = ChatTrends.of(
-        month(2026, 1, days: 10, reply: 5, starts: 0),
-        myName: 'Robin',
-        them: 'Maya',
+  group('ChartMaker', () {
+    test('reads a spec, keeping one axis and at most three series', () {
+      final spec = ChartSpec.parse(
+        '{"title": "Messages", "kind": "line", "x": "month", "series": ['
+        '{"label": "You", "who": "me", "measure": "messages"}, '
+        '{"label": "Maya", "who": "them", "measure": "messages"}, '
+        '{"label": "Words", "who": "both", "measure": "words"}]}',
       );
-      expect(t.months, hasLength(1));
-      final m = t.months.single;
-      expect(m.theirs, 10);
-      expect(m.mine, 20, reason: '"hey" and the reply, each day');
-      // Robin opened every day with "hey"; Maya answered a minute later.
-      expect(m.iStarted, 10);
-      expect(m.theirReply, 1);
-      expect(m.myReply, 5);
-      expect(t.direction, TrendDirection.unknown, reason: 'one month only');
+      expect(spec.kind, ChartKind.line);
+      expect(spec.axis, ChartAxis.month);
+      expect(spec.series.map((s) => s.label), ['You', 'Maya']);
+      expect(spec.note, contains('one chart'));
     });
 
-    test('warming up: more talk, faster answers, they start more', () {
-      final t = ChatTrends.of(
-        [
-          ...month(2026, 1, days: 5, reply: 5),
-          ...month(2026, 2, days: 5, reply: 5),
-          ...month(2026, 3, days: 5, reply: 5),
-          ...month(2026, 4, days: 20, reply: 5, words: 9, starts: 10),
-          ...month(2026, 5, days: 20, reply: 5, words: 9, starts: 10),
-        ],
-        myName: 'Robin',
-        them: 'Maya',
+    test('a request that cannot be charted says why', () {
+      expect(
+        () => ChartSpec.parse('{"error": "I can only count messages."}'),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            'I can only count messages.',
+          ),
+        ),
       );
-      expect(t.direction, TrendDirection.warming);
-      expect(t.notes.join(' '), contains('Maya starts more'));
-      expect(t.notes.join(' '), contains('You talk'));
     });
 
-    test('cooling off the other way round, with quiet months kept', () {
-      final t = ChatTrends.of(
-        [
-          ...month(2026, 1, days: 20, reply: 5, words: 9, starts: 10),
-          ...month(2026, 2, days: 20, reply: 5, words: 9, starts: 10),
-          ...month(2026, 3, days: 20, reply: 5, words: 9, starts: 10),
-          ...month(2026, 5, days: 4, reply: 5),
-          ...month(2026, 6, days: 4, reply: 5),
+    test('counts each side per month, on the phone', () {
+      const spec = ChartSpec(
+        title: 't',
+        kind: ChartKind.bar,
+        axis: ChartAxis.month,
+        series: [
+          ChartSeries(
+            label: 'You',
+            who: ChartWho.me,
+            measure: ChartMeasure.messages,
+          ),
+          ChartSeries(
+            label: 'Maya',
+            who: ChartWho.them,
+            measure: ChartMeasure.messages,
+          ),
         ],
-        myName: 'Robin',
-        them: 'Maya',
       );
-      expect(t.months.map((m) => m.month.month), [1, 2, 3, 4, 5, 6]);
-      expect(t.months[3].total, 0);
-      expect(t.direction, TrendDirection.cooling);
+      final data = ChartMaker.count(spec, [
+        ...month(2026, 1, days: 4, reply: 5),
+        ...month(2026, 3, days: 2, reply: 5),
+      ], myName: 'Robin');
+      expect(data.labels, ['Jan 26', 'Feb 26', 'Mar 26']);
+      // Each day: Robin's "hey" and reply, and one line from Maya.
+      expect(data.values[0], [8, 0, 4]);
+      expect(data.values[1], [4, 0, 2]);
+    });
+
+    test('reply times, who starts, and words they use', () {
+      ChartData count(
+        ChartMeasure m,
+        ChartWho who, [
+        List<String> terms = const [],
+      ]) => ChartMaker.count(
+        ChartSpec(
+          title: 't',
+          kind: ChartKind.bar,
+          axis: ChartAxis.total,
+          series: [ChartSeries(label: 'x', who: who, measure: m, terms: terms)],
+        ),
+        month(2026, 1, days: 6, reply: 5, starts: 2),
+        myName: 'Robin',
+      );
+      expect(count(ChartMeasure.replyMinutes, ChartWho.me).values[0], [5]);
+      expect(count(ChartMeasure.started, ChartWho.them).values[0], [2]);
+      expect(count(ChartMeasure.started, ChartWho.me).values[0], [4]);
+      expect(count(ChartMeasure.contains, ChartWho.me, ['NICE']).values[0], [
+        6,
+      ]);
+    });
+
+    test('the description is all that is sent', () async {
+      final sent = <Map<String, Object?>>[];
+      final spec =
+          await ChartMaker(
+            openai: fake(
+              sent: sent,
+              answer: (_) =>
+                  '{"title": "By hour", "kind": "bar", "x": "hour", '
+                  '"series": [{"label": "Both", "who": "both", '
+                  '"measure": "messages"}]}',
+            ),
+          ).design(
+            'what time of day we text',
+            model: 'gpt-5.6-terra',
+            me: 'Robin',
+            them: 'Maya',
+          );
+      expect(spec.axis, ChartAxis.hour);
+      final messages = sent.single['messages']! as List;
+      expect((messages.last as Map)['content'], 'what time of day we text');
+      expect(messages, hasLength(2));
     });
   });
 
@@ -339,13 +388,33 @@ void main() {
       expect(sent, isEmpty);
     });
 
-    testWidgets('how it is going reads the months off the phone', (
+    testWidgets('a described graph is drawn from the phone\'s counts', (
       tester,
     ) async {
-      await pump(tester, const TrendsScreen(), store(), fake());
-      expect(find.byKey(const ValueKey('trend-verdict')), findsOneWidget);
-      expect(find.text('Too early to tell'), findsOneWidget);
-      expect(find.text('Jan 26'), findsOneWidget);
+      await pump(
+        tester,
+        const GraphScreen(),
+        store(),
+        fake(
+          answer: (_) =>
+              '{"title": "Messages per month", "kind": "bar", "x": "month", '
+              '"series": [{"label": "You", "who": "me", "measure": '
+              '"messages"}, {"label": "Maya", "who": "them", "measure": '
+              '"messages"}]}',
+        ),
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('graph-field')),
+        'messages per month, me vs her',
+      );
+      await tester.tap(find.byTooltip('Make it'));
+      await tester.pumpAndSettle();
+      expect(find.text('Messages per month'), findsOneWidget);
+      expect(find.byKey(const ValueKey('chart')), findsOneWidget);
+      expect(find.text('Jan 26 · You 12 · Maya 6'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('chart-table')));
+      await tester.pumpAndSettle();
+      expect(find.text('Show the chart'), findsOneWidget);
     });
   });
 }

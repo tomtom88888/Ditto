@@ -38,9 +38,11 @@ AI provider you choose (OpenAI, Claude or Gemini), made with your own key.
   questions, bubbles), with a free quick fix. **Is it like me?** has the
   model score it against your How you write guide, your numbers and real
   messages; the rewrite follows the guide too.
-- **How it's going.** Month by month: how much you each write, how fast they
-  answer, who starts conversations, and whether it's warming up or cooling
-  off. Counted on the phone, no API calls.
+- **Make a graph.** Describe a chart ("messages per month, me vs her",
+  "what time of day we text", "how often we say love") and get it. Only the
+  description is sent; the model picks what to count, and the numbers are
+  counted on the phone. Bars or lines, tap for exact values, or view it as a
+  table.
 - **Chat groupings.** Groups your replies by what was being talked about,
   names each group, draws them on a map, and shows how topics change over
   time.
@@ -209,7 +211,7 @@ app stored, optionally including the keys.
 git clone https://github.com/tomtom88888/ChatingTools.git
 cd ChatingTools
 flutter pub get
-flutter test          # 372 tests, no network or device needed
+flutter test          # 374 tests, no network or device needed
 flutter run
 ```
 
@@ -282,7 +284,7 @@ lib/
   theme/                     palettes, type, and per-app bubble colours
   widgets/                   shared UI kit, export guides, job cards, tray
 android/.../MainActivity.kt  keeps the Flutter engine beyond the screen
-test/                        372 unit and widget tests
+test/                        374 unit and widget tests
 test/fixtures/               invented Android and iOS exports
 docs/business-plan.txt       backlog: how it could be sold one day
 ```
@@ -293,7 +295,7 @@ docs/business-plan.txt       backlog: how it could be sold one day
 flutter test
 ```
 
-372 tests, none needing a network or device. They cover both parsers
+374 tests, none needing a network or device. They cover both parsers
 (including Instagram's encoding repair and multi-file threads), the
 OpenAI/Claude/Gemini request and response shapes, error mapping, retries and
 resuming after the app was away, retrieval and the vector maths, prompt

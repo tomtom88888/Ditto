@@ -6,6 +6,7 @@ import '../models/app_settings.dart';
 import '../models/stored_exchange.dart';
 import '../models/suggestion_feedback.dart';
 import '../services/ask_chats.dart';
+import '../services/chart_maker.dart';
 import '../services/chat_analysis.dart';
 import '../services/chat_facts.dart';
 import '../services/chat_groupings.dart';
@@ -174,6 +175,12 @@ final chatAnalystProvider = Provider<ChatAnalyst?>((ref) {
   final openai = ref.watch(openAiServiceProvider);
   if (openai == null) return null;
   return ChatAnalyst(openai: openai);
+});
+
+final chartMakerProvider = Provider<ChartMaker?>((ref) {
+  final openai = ref.watch(openAiServiceProvider);
+  if (openai == null) return null;
+  return ChartMaker(openai: openai);
 });
 
 final chatSearchProvider = Provider<ChatSearch?>((ref) {
