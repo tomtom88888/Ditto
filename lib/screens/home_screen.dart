@@ -15,11 +15,11 @@ import '../widgets/failure_text.dart';
 import '../widgets/format.dart';
 import '../widgets/paper_dialog.dart';
 import '../widgets/paper_ui.dart';
+import 'analysis_screen.dart';
 import 'ask_screen.dart';
 import 'chat_data_screen.dart';
 import 'chat_groupings_screen.dart';
 import 'check_screen.dart';
-import 'facts_screen.dart';
 import 'generate_screen.dart';
 import 'openers_screen.dart';
 import 'search_screen.dart';
@@ -569,10 +569,10 @@ class _Explore extends StatelessWidget {
         onTap: () => open(const SearchScreen()),
       ),
       _Tile(
-        icon: Icons.favorite_border_rounded,
-        title: 'Remember',
-        subtitle: 'Things they’ve told you',
-        onTap: () => open(const FactsScreen()),
+        icon: Icons.psychology_outlined,
+        title: 'Analysis',
+        subtitle: 'How you write, how you both act',
+        onTap: () => open(const AnalysisScreen()),
       ),
       _Tile(
         icon: Icons.insights_rounded,

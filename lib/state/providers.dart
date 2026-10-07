@@ -6,6 +6,7 @@ import '../models/app_settings.dart';
 import '../models/stored_exchange.dart';
 import '../models/suggestion_feedback.dart';
 import '../services/ask_chats.dart';
+import '../services/chat_analysis.dart';
 import '../services/chat_facts.dart';
 import '../services/chat_groupings.dart';
 import '../services/chat_search.dart';
@@ -39,6 +40,10 @@ final groupingsStoreProvider = Provider<GroupingsStore>(
 );
 
 final factsStoreProvider = Provider<FactsStore>((ref) => const FactsStore());
+
+final analysisStoreProvider = Provider<AnalysisStore>(
+  (ref) => const AnalysisStore(),
+);
 
 /// Typed as the interface so tests can substitute an in-memory store.
 final exchangeStoreProvider = Provider<ExchangeStore>((ref) {
@@ -165,6 +170,12 @@ final chatFactsProvider = Provider<ChatFacts?>((ref) {
   return ChatFacts(openai: openai);
 });
 
+final chatAnalystProvider = Provider<ChatAnalyst?>((ref) {
+  final openai = ref.watch(openAiServiceProvider);
+  if (openai == null) return null;
+  return ChatAnalyst(openai: openai);
+});
+
 final chatSearchProvider = Provider<ChatSearch?>((ref) {
   final openai = ref.watch(openAiServiceProvider);
   if (openai == null) return null;
@@ -215,6 +226,7 @@ class ChatsNotifier extends AsyncNotifier<List<ChatMemory>> {
     await ref.read(exchangeStoreProvider).deleteChat(chatId);
     // What was learned about them goes with the chat.
     await ref.read(factsStoreProvider).remove(chatId);
+    await ref.read(analysisStoreProvider).remove(chatId);
     await reload();
   }
 }
@@ -273,6 +285,7 @@ class DataWiper {
     await _ref.read(usageStoreProvider).clear();
     await _ref.read(groupingsStoreProvider).clear();
     await _ref.read(factsStoreProvider).clear();
+    await _ref.read(analysisStoreProvider).clear();
     if (includeApiKey) await _ref.read(apiKeysProvider.notifier).clear();
     _ref.invalidate(settingsProvider);
     _ref.invalidate(exchangeStoreProvider);

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../models/app_settings.dart';
 import '../models/chat_turn.dart';
 import '../models/extracted_message.dart';
@@ -104,6 +106,7 @@ class ReplyGenerator {
     List<String> voiceSample = const [],
     bool group = false,
     List<String> facts = const [],
+    List<String> styleGuide = const [],
   }) async {
     if (conversation.isEmpty) {
       throw const OpenAiException(
@@ -134,6 +137,7 @@ class ReplyGenerator {
           newTopic: newTopic,
           group: group,
           facts: facts,
+          styleGuide: styleGuide,
         );
 
     final answers = await _bestDrafts(
@@ -198,6 +202,7 @@ class ReplyGenerator {
     StyleProfile profile = StyleProfile.empty,
     List<String> voiceSample = const [],
     List<String> facts = const [],
+    List<String> styleGuide = const [],
     String note = '',
     String quietFor = '',
     bool group = false,
@@ -215,6 +220,7 @@ class ReplyGenerator {
       earlier: recent,
       earlierIntro: 'How the chat with $them went the last time you talked:',
       facts: facts,
+      styleGuide: styleGuide,
       extra:
           'There is no new message to answer: the chat has gone quiet'
           '${quietFor.isEmpty ? "" : " for $quietFor"}. Write one message $me '
@@ -245,6 +251,7 @@ class ReplyGenerator {
     List<String> voiceSample = const [],
     List<ChatTurn> recent = const [],
     bool group = false,
+    List<String> styleGuide = const [],
   }) async {
     final me = _name(settings.myName, 'the user');
     final system = buildSystemPrompt(
@@ -254,6 +261,7 @@ class ReplyGenerator {
       hasExamples: false,
       group: group,
       earlier: recent,
+      styleGuide: styleGuide,
       earlierIntro: 'The end of the chat so far, for background:',
       extra:
           '$me has written the message in the last user message and wants '
@@ -273,6 +281,67 @@ class ReplyGenerator {
     );
   }
 
+  /// How much [draft], a message you wrote, sounds like you writing to
+  /// [settings.theirName]: judged against [styleGuide], your measured habits
+  /// and real messages you sent them.
+  Future<StyleVerdict> judgeMine({
+    required String draft,
+    required AppSettings settings,
+    StyleProfile profile = StyleProfile.empty,
+    List<String> voiceSample = const [],
+    List<String> styleGuide = const [],
+  }) async {
+    final me = _name(settings.myName, 'the user');
+    final them = _name(settings.theirName, 'them');
+    final habits = profile.describe(me);
+    final system = StringBuffer(
+      'You judge whether a message sounds like $me texting $them. Compare it '
+      'with how $me really writes to $them, below, and nothing else: not '
+      'whether it is a good message, only whether it is $me.',
+    );
+    if (styleGuide.isNotEmpty) {
+      system
+        ..writeln()
+        ..writeln()
+        ..writeln('How $me writes to $them:')
+        ..write(styleGuide.map((l) => '- $l').join('\n'));
+    }
+    if (habits.isNotEmpty) {
+      system
+        ..writeln()
+        ..writeln()
+        ..write(habits);
+    }
+    if (voiceSample.isNotEmpty) {
+      system
+        ..writeln()
+        ..writeln()
+        ..writeln('Messages $me really sent $them:')
+        ..write(
+          voiceSample.map((m) => '- ${m.replaceAll('\n', ' / ')}').join('\n'),
+        );
+    }
+    system
+      ..writeln()
+      ..writeln()
+      ..write(
+        'Answer only with JSON: {"score": <0-10, 10 = exactly how $me writes>, '
+        '"verdict": "<a few words>", "notes": ["<what gives it away, or what '
+        'is spot on, quoting the words; at most 4>"]}. Notes in English, '
+        'quotes as written.',
+      );
+    final raw = await openai.chat(
+      model: settings.generationModel,
+      messages: [
+        {'role': 'system', 'content': system.toString()},
+        {'role': 'user', 'content': draft.trim()},
+      ],
+      jsonMode: true,
+      temperature: 0,
+    );
+    return StyleVerdict.parse(raw);
+  }
+
   /// Rewrites one suggestion according to [refinement], keeping what it is
   /// for: a topic change stays a topic change.
   Future<ReplySuggestion> refine({
@@ -286,6 +355,7 @@ class ReplyGenerator {
     List<String> voiceSample = const [],
     bool group = false,
     List<String> facts = const [],
+    List<String> styleGuide = const [],
   }) async {
     final me = _name(settings.myName, 'the user');
     final messages = buildMessages(
@@ -298,6 +368,7 @@ class ReplyGenerator {
       newTopic: suggestion.isNewTopic,
       group: group,
       facts: facts,
+      styleGuide: styleGuide,
       extra:
           'You had drafted this as your next message:\n'
           '${suggestion.text}\n\n'
@@ -338,6 +409,7 @@ class ReplyGenerator {
     bool newTopic = false,
     bool group = false,
     List<String> facts = const [],
+    List<String> styleGuide = const [],
     String? extra,
   }) {
     final me = settings.myName;
@@ -357,6 +429,7 @@ class ReplyGenerator {
           group: group,
           earlier: earlier,
           facts: facts,
+          styleGuide: styleGuide,
           extra: extra,
         ),
       },
@@ -449,6 +522,7 @@ class ReplyGenerator {
     bool group = false,
     List<ChatTurn> earlier = const [],
     List<String> facts = const [],
+    List<String> styleGuide = const [],
     String? extra,
     String? earlierIntro,
   }) {
@@ -506,6 +580,14 @@ class ReplyGenerator {
         'Things $me knows about $them from their chats, to call back to only '
         'when one fits what is being said (never list them, never force one '
         'in):\n${facts.map((f) => '- $f').join('\n')}',
+      );
+    }
+
+    if (styleGuide.isNotEmpty) {
+      section(
+        'How $me writes to $them, as studied from their whole chat (follow '
+        'it closely; it is $me\'s voice):\n'
+        '${styleGuide.map((l) => '- $l').join('\n')}',
       );
     }
 
@@ -602,5 +684,50 @@ class ReplyGenerator {
       }
     }
     return out.trim();
+  }
+}
+
+/// A model's judgement of whether a message sounds like you.
+class StyleVerdict {
+  const StyleVerdict({
+    required this.score,
+    required this.verdict,
+    this.notes = const [],
+  });
+
+  /// 0 to 10; 10 is exactly how you write.
+  final int score;
+  final String verdict;
+  final List<String> notes;
+
+  static StyleVerdict parse(String raw) {
+    final start = raw.indexOf('{');
+    final end = raw.lastIndexOf('}');
+    Object? json;
+    if (start >= 0 && end > start) {
+      try {
+        json = jsonDecode(raw.substring(start, end + 1));
+      } on FormatException {
+        json = null;
+      }
+    }
+    if (json is! Map) {
+      throw const OpenAiException(
+        OpenAiErrorKind.badResponse,
+        "Couldn't read the judgement. Try again.",
+      );
+    }
+    final score = json['score'];
+    final verdict = json['verdict'];
+    final notes = json['notes'];
+    return StyleVerdict(
+      score: score is num ? score.round().clamp(0, 10) : 0,
+      verdict: verdict is String ? verdict.trim() : '',
+      notes: [
+        if (notes is List)
+          for (final n in notes)
+            if (n is String && n.trim().isNotEmpty) n.trim(),
+      ],
+    );
   }
 }

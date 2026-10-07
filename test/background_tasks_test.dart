@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:replylikeme/models/ai_provider.dart';
-import 'package:replylikeme/screens/facts_screen.dart';
+import 'package:replylikeme/screens/analysis_screen.dart';
 import 'package:replylikeme/services/chat_facts.dart';
 import 'package:replylikeme/services/memory_exchange_store.dart';
 import 'package:replylikeme/services/openai_exception.dart';
@@ -230,7 +230,7 @@ void main() {
                 child: TextButton(
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => const FactsScreen(),
+                      builder: (_) => const AnalysisScreen(),
                     ),
                   ),
                   child: const Text('open'),
@@ -243,7 +243,7 @@ void main() {
     );
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Find things to remember'));
+    await tester.tap(find.text('Analyse the chat'));
     await tester.pump();
     await tester.pump();
 
@@ -256,10 +256,10 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
-    expect(find.byType(FactsScreen), findsNothing);
+    expect(find.byType(AnalysisScreen), findsNothing);
     expect(find.text('open'), findsOneWidget);
-    expect(find.text('Remembering Maya'), findsOneWidget);
-    expect(find.byKey(const ValueKey('task-stop-facts-1')), findsOneWidget);
+    expect(find.text('Analysing Maya'), findsOneWidget);
+    expect(find.byKey(const ValueKey('task-stop-analysis-1')), findsOneWidget);
 
     gate.complete();
     await tester.pump();

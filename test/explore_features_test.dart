@@ -10,7 +10,7 @@ import 'package:replylikeme/models/ai_provider.dart';
 import 'package:replylikeme/models/app_settings.dart';
 import 'package:replylikeme/models/chat_turn.dart';
 import 'package:replylikeme/models/stored_exchange.dart';
-import 'package:replylikeme/screens/facts_screen.dart';
+import 'package:replylikeme/screens/analysis_screen.dart';
 import 'package:replylikeme/screens/search_screen.dart';
 import 'package:replylikeme/services/chat_facts.dart';
 import 'package:replylikeme/services/chat_groupings.dart';
@@ -510,14 +510,14 @@ void main() {
           '{"facts": [{"text": "Has a dog called Biscuit", "category": '
           '"People & pets"}, {"text": "Loves jazz", "category": "Likes"}]}',
     );
-    await pump(tester, const FactsScreen(), store: store, openai: openai);
-    await tester.tap(find.text('Find things to remember'));
+    await pump(tester, const AnalysisScreen(), store: store, openai: openai);
+    await tester.tap(find.text('Analyse the chat'));
     await tester.pumpAndSettle();
 
     expect(find.text('Has a dog called Biscuit'), findsOneWidget);
     expect(find.text('People & pets'), findsOneWidget);
     expect(find.text('Loves jazz'), findsOneWidget);
-    expect(sent, hasLength(1));
+    expect(sent, hasLength(2), reason: 'the facts, then the analysis');
 
     // Likes comes before People & pets, so the first × is jazz.
     await tester.tap(find.byTooltip('Forget this').first);
@@ -528,10 +528,10 @@ void main() {
     expect(saved!.facts.map((f) => f.text), ['Has a dog called Biscuit']);
 
     // Coming back shows them without asking again.
-    await pump(tester, const FactsScreen(), store: store, openai: openai);
+    await pump(tester, const AnalysisScreen(), store: store, openai: openai);
     expect(find.text('Has a dog called Biscuit'), findsOneWidget);
-    expect(find.text('Look through the chat again'), findsOneWidget);
-    expect(sent, hasLength(1));
+    expect(find.text('Analyse again'), findsOneWidget);
+    expect(sent, hasLength(2));
   });
 
   testWidgets('remember opens on the chat it last read, not the first', (
@@ -560,7 +560,7 @@ void main() {
       ),
     );
     final openai = fake(sent: [], answer: (_) => '{"facts": []}');
-    await pump(tester, const FactsScreen(), store: store, openai: openai);
+    await pump(tester, const AnalysisScreen(), store: store, openai: openai);
     expect(find.text('Starts a bank job'), findsOneWidget);
   });
 }

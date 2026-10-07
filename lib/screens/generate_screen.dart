@@ -83,6 +83,9 @@ class _GenerateScreenState extends ConsumerState<GenerateScreen> {
   /// What is remembered about the person being replied to, for callbacks.
   List<String> _facts = const [];
 
+  /// How you write to the person replied to, from their chat's analysis.
+  List<String> _styleGuide = const [];
+
   /// A one-off instruction for this reply: what to say, as opposed to how.
   /// Cleared with the screenshot, because it belongs to this moment.
   final _noteController = TextEditingController();
@@ -432,6 +435,10 @@ class _GenerateScreenState extends ConsumerState<GenerateScreen> {
                       const <ChatFact>[])
                 f.text,
             ];
+      final styleGuide = chat == null
+          ? const <String>[]
+          : (await ref.read(analysisStoreProvider).forChat(chat.id))?.writing ??
+                const <String>[];
       final variants = await generator.generate(
         conversation: conversation,
         examples: retrieved.examples,
@@ -441,10 +448,12 @@ class _GenerateScreenState extends ConsumerState<GenerateScreen> {
         voiceSample: voiceSample,
         group: _isGroup(chat),
         facts: facts,
+        styleGuide: styleGuide,
       );
       if (mounted) {
         setState(() {
           _facts = facts;
+          _styleGuide = styleGuide;
           _conversation = conversation;
           _examples = retrieved.examples;
           _skipped = retrieved.skipped;
@@ -482,6 +491,7 @@ class _GenerateScreenState extends ConsumerState<GenerateScreen> {
         voiceSample: _voiceSample,
         group: _isGroup(_currentReplyingTo(_enabledChats())),
         facts: _facts,
+        styleGuide: _styleGuide,
       );
       if (!mounted) return;
       setState(() {
