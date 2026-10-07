@@ -47,7 +47,7 @@ AI provider you choose (OpenAI, Claude or Gemini), made with your own key.
 - **Chat data.** Reply times, who texts first, double texts, busiest days,
   favourite words and emoji. Counted on the phone, no API calls.
 
-Long jobs (importing, Remember, groupings) run in the background with a
+Long jobs (importing, Analysis, groupings) run in the background with a
 progress tray at the bottom of every screen. You can leave the screen or
 switch apps; on Android a "Ditto is working" notification keeps the job
 alive until it finishes.
@@ -132,7 +132,7 @@ else*). Retrieval takes a shortlist by similarity, then picks varied
 examples, nudged towards recent ones. Those real exchanges go into the
 request as actual turns of the conversation, closest last, and the model is
 told it *is* you texting that person, with your measured habits, a sample of
-your recent messages, any facts from Remember, and your note ("say I'll be
+your recent messages, your How you write guide, facts from Analysis, and your note ("say I'll be
 late"). Several drafts come back in one request; each is held to your habits
 where the numbers are clear (no capitals you never use, no emoji if you send
 none) and the most typical are kept.
@@ -188,7 +188,7 @@ app stored, optionally including the keys.
   storage on the phone.
 - What is sent to your AI provider: the text being fingerprinted when
   importing (and a search query), the screenshot you pick, the prompt when
-  writing a reply, what the other person wrote when you run Remember, and a
+  writing a reply, a sample of the chat when you run Analysis, and a
   few short samples per group when naming groupings. Nothing goes anywhere
   else.
 - `.gitignore` blocks `*.txt`, `*.zip` and `*.jsonl` outside `test/fixtures/`,
@@ -266,7 +266,8 @@ lib/
     retrieval.dart           shortlist, variety, recency
     reply_generator.dart     prompts, drafts and tweaks
     style_conformer.dart     holds drafts to your habits
-    chat_facts.dart          Remember
+    chat_facts.dart          things to remember (Analysis)
+    chat_analysis.dart       How you write, and how you both act
     chat_search.dart         Search
     chat_groupings.dart      groupings, plus group_map and topic_timeline
     finetune_service.dart    JSONL, cost estimate, job polling
@@ -296,7 +297,7 @@ flutter test
 (including Instagram's encoding repair and multi-file threads), the
 OpenAI/Claude/Gemini request and response shapes, error mapping, retries and
 resuming after the app was away, retrieval and the vector maths, prompt
-building, Remember, Search and groupings, the SQLite store and its upgrades
+building, Analysis, Search and groupings, the SQLite store and its upgrades
 (against real SQLite via `sqflite_common_ffi`), background jobs and the tray,
 and widget tests that boot the real app: setup and key checks, home,
 settings, importing, and the whole reply flow.
