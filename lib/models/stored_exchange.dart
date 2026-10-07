@@ -24,6 +24,7 @@ class StoredExchange {
     required this.contextText,
     required this.replyText,
     required this.vector,
+    this.focus,
     this.timestamp,
     this.chatId = -1,
     this.hash = '',
@@ -47,6 +48,26 @@ class StoredExchange {
   /// Unit-length embedding, so cosine similarity is a plain dot product.
   final Float32List vector;
 
+  /// A tighter fingerprint of just the moment itself — the last messages
+  /// before the reply, and the reply — for search. `null` until made.
+  final Float32List? focus;
+
+  /// The turns before the reply that [focusText] covers.
+  static const int focusTurns = 2;
+
+  /// What [focus] fingerprints.
+  String get focusText => focusTextOf(context, replyText);
+
+  static String focusTextOf(List<ChatTurn> context, String replyText) {
+    final recent = context.length > focusTurns
+        ? context.sublist(context.length - focusTurns)
+        : context;
+    return [
+      for (final t in recent) '${t.sender}: ${t.text}',
+      'Me: $replyText',
+    ].join('\n');
+  }
+
   final DateTime? timestamp;
 
   /// Identifies the exchange's content, so re-importing an export only embeds
@@ -55,17 +76,19 @@ class StoredExchange {
 
   final ExchangeSource source;
 
-  StoredExchange copyWith({int? id, int? chatId}) => StoredExchange(
-    id: id ?? this.id,
-    chatId: chatId ?? this.chatId,
-    context: context,
-    contextText: contextText,
-    replyText: replyText,
-    vector: vector,
-    timestamp: timestamp,
-    hash: hash,
-    source: source,
-  );
+  StoredExchange copyWith({int? id, int? chatId, Float32List? focus}) =>
+      StoredExchange(
+        id: id ?? this.id,
+        chatId: chatId ?? this.chatId,
+        context: context,
+        contextText: contextText,
+        replyText: replyText,
+        vector: vector,
+        focus: focus ?? this.focus,
+        timestamp: timestamp,
+        hash: hash,
+        source: source,
+      );
 
   /// A stable fingerprint of an exchange's text: 64-bit FNV-1a over the
   /// context, a separator, and the reply.

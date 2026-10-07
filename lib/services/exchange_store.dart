@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../models/stored_exchange.dart';
 import '../models/suggestion_feedback.dart';
 
@@ -38,6 +40,9 @@ abstract interface class ExchangeStore {
 
   /// Exchanges in the given chats (or all of them), oldest first.
   Future<List<StoredExchange>> all({Set<int>? chatIds});
+
+  /// Stores search fingerprints for exchanges already saved, by row id.
+  Future<void> saveFocus(Map<int, Float32List> focus);
 
   Future<void> recordFeedback(SuggestionFeedback feedback);
 

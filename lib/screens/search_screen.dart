@@ -5,11 +5,11 @@ import '../models/app_settings.dart';
 import '../models/stored_exchange.dart';
 import '../services/chat_search.dart';
 import '../state/providers.dart';
-import '../theme/bubbles.dart';
+import '../state/tasks.dart';
 import '../theme/tokens.dart';
-import '../widgets/chat_apps.dart';
 import '../widgets/failure_text.dart';
 import '../widgets/format.dart';
+import '../widgets/moment_card.dart';
 import '../widgets/paper_ui.dart';
 import 'settings/settings_widgets.dart';
 
@@ -31,6 +31,54 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Object? _error;
   List<SearchHit>? _hits;
   String _searched = '';
+
+  /// The one-time job that gives chats imported before search fingerprints
+  /// existed their own.
+  static const String prepTaskId = 'search-prep';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _prepare());
+  }
+
+  /// Starts making the missing search fingerprints, if any are missing. A
+  /// one-time, cheap embedding job that runs in the background.
+  Future<void> _prepare() async {
+    final memory = ref.read(styleMemoryServiceProvider);
+    if (memory == null) return;
+    final settings = await ref.read(settingsProvider.future);
+    final chats = await ref.read(chatsProvider.future);
+    final ids = {for (final c in _searchable(chats, settings)) c.id};
+    if (ids.isEmpty) return;
+    final missing = await memory.missingFocus(
+      chatIds: ids,
+      embeddingModel: settings.embeddingModel,
+      dimensions: settings.embeddingDimensions,
+    );
+    if (missing == 0 || !mounted) return;
+    ref
+        .read(taskCenterProvider.notifier)
+        .start(
+          id: prepTaskId,
+          title: 'Sharpening search',
+          detail: '${grouped(missing)} moments, one time',
+          work: (task) async {
+            await memory.addFocus(
+              chatIds: ids,
+              embeddingModel: settings.embeddingModel,
+              dimensions: settings.embeddingDimensions,
+              onProgress: (done, of) => task
+                ..check()
+                ..report(
+                  detail: '${grouped(done)} of ${grouped(of)} moments',
+                  progress: of == 0 ? null : done / of,
+                ),
+            );
+            return null;
+          },
+        );
+  }
 
   @override
   void dispose() {
@@ -70,9 +118,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         embeddingModel: settings.embeddingModel,
         dimensions: settings.embeddingDimensions,
         limit: settings.searchResultCount,
-        // The closest moments are read by the chat model, which keeps
-        // only the ones that really match.
-        model: settings.generationModel,
       );
       if (mounted) {
         setState(() {
@@ -92,6 +137,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final chats = ref.watch(chatsProvider);
     final settings = ref.watch(settingsProvider).value ?? const AppSettings();
     final hasKey = ref.watch(chatSearchProvider) != null;
+    final preparing = ref
+        .watch(taskCenterProvider)
+        .any((t) => t.id == prepTaskId && t.running);
 
     return PaperScreen(
       children: [
@@ -141,6 +189,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   if (_hits != null && !_busy) _search(searchable);
                 },
               ),
+              if (preparing)
+                const Notice(
+                  'Sharpening search for the chats you imported earlier. '
+                  'Results get better when it finishes.',
+                ),
               if (!hasKey)
                 const Notice(
                   'Add an OpenAI or Gemini key in Settings to search.',
@@ -167,11 +220,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
               if (hits != null && hits.isNotEmpty) ...[
                 MonoLabel(
-                  '${hits.length} ${hits.length == 1 ? "moment" : "moments"}, '
-                  'best match first',
+                  hits.first.weak
+                      ? 'Nothing clearly matched · the closest'
+                      : '${hits.length} '
+                            '${hits.length == 1 ? "moment" : "moments"}, '
+                            'best match first',
                 ),
                 for (final hit in hits)
-                  _HitCard(
+                  MomentCard(
                     key: ValueKey(hit.exchange.id),
                     hit: hit,
                     chat: names[hit.exchange.chatId] ?? '',
@@ -185,10 +241,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ];
           },
         ),
-        const Footnote(
-          'The closest moments are read by your writing model, which keeps '
-          'only the real matches.',
-        ),
+        const Footnote('Your chats are searched on this phone.'),
       ],
     );
   }
@@ -307,145 +360,4 @@ class _ChatFilter extends StatelessWidget {
       ),
     );
   }
-}
-
-/// One moment: when and where, the lead-up, and your reply.
-class _HitCard extends StatefulWidget {
-  const _HitCard({
-    required this.hit,
-    required this.chat,
-    required this.myName,
-    super.key,
-  });
-
-  final SearchHit hit;
-  final String chat;
-  final String myName;
-
-  @override
-  State<_HitCard> createState() => _HitCardState();
-}
-
-class _HitCardState extends State<_HitCard> {
-  bool _open = false;
-
-  static const int _collapsed = 3;
-
-  @override
-  Widget build(BuildContext context) {
-    final e = widget.hit.exchange;
-    final when = e.timestamp;
-    final turns = _open || e.context.length <= _collapsed
-        ? e.context
-        : e.context.sublist(e.context.length - _collapsed);
-    final hidden = e.context.length - turns.length;
-    final bubbles = Bubbles.of(ChatApps.of(context, e.chatId));
-
-    return PaperCard(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${when == null ? "Date unknown" : dayMonthYear(when)}'
-                  '${widget.chat.isEmpty ? "" : " · ${bidiIsolate(widget.chat)}"}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Type.strong(size: 13, height: 1.3),
-                ),
-              ),
-              if (widget.hit.wordMatch) ...[
-                Icon(Icons.text_fields_rounded, size: 14, color: Paper.accent),
-                const SizedBox(width: 4),
-              ],
-              Text(
-                widget.hit.score.clamp(0, 1).toStringAsFixed(2),
-                style: Type.numeric(
-                  size: 11.5,
-                  color: Paper.muted,
-                  weight: FontWeight.w400,
-                ),
-              ),
-            ],
-          ),
-          if (widget.hit.why != null) ...[
-            const SizedBox(height: 3),
-            Text(
-              widget.hit.why!,
-              style: Type.prose(size: 12.5, color: Paper.accent, height: 1.3),
-            ),
-          ],
-          const SizedBox(height: 6),
-          if (hidden > 0)
-            GestureDetector(
-              onTap: () => setState(() => _open = true),
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  '…$hidden earlier · show',
-                  style: Type.prose(size: 12, color: Paper.accent),
-                ),
-              ),
-            ),
-          for (final turn in turns)
-            _Line(
-              text: turn.text,
-              who: turn.sender,
-              mine: turn.sender == widget.myName,
-              bubbles: bubbles,
-            ),
-          _Line(
-            text: e.replyText,
-            who: 'You',
-            mine: true,
-            reply: true,
-            bubbles: bubbles,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Line extends StatelessWidget {
-  const _Line({
-    required this.text,
-    required this.who,
-    required this.mine,
-    required this.bubbles,
-    this.reply = false,
-  });
-
-  final String text;
-  final String who;
-  final bool mine;
-  final bool reply;
-  final Bubbles bubbles;
-
-  @override
-  Widget build(BuildContext context) => Align(
-    alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-    child: Container(
-      margin: const EdgeInsets.only(top: 4),
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-      constraints: const BoxConstraints(maxWidth: 290),
-      decoration: bubbles
-          .fill(mine: mine)
-          .copyWith(
-            borderRadius: Corner.all(Corner.bubble),
-            border: reply ? Border.all(color: Paper.accent, width: 1.5) : null,
-          ),
-      child: Text(
-        text,
-        style: Type.prose(
-          size: 13.5,
-          color: bubbles.text(mine: mine),
-          height: 1.35,
-        ),
-      ),
-    ),
-  );
 }

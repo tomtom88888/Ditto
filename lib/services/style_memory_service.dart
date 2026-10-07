@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import '../models/chat_app.dart';
@@ -102,9 +103,10 @@ class StyleMemoryService {
   final ExchangeStore store;
   final Retrieval retrieval;
 
-  /// Exchanges per embeddings request. Large enough to keep the round-trip
-  /// count low, small enough to stay well inside the request size limit.
-  static const int embedBatchSize = 96;
+  /// Exchanges per embeddings request. Each sends two texts (the context,
+  /// and the moment for search), so this keeps a request inside Gemini's
+  /// 100-text limit as well as the size limit.
+  static const int embedBatchSize = 48;
 
   /// OpenAI's retrieval quality falls off with very short contexts and the
   /// embedding cost is dominated by long ones, so contexts are capped.
@@ -233,8 +235,13 @@ class StyleMemoryService {
       }
       final end = (start + embedBatchSize).clamp(0, todo.length);
       final batch = todo.sublist(start, end);
+      // The context for writing replies, then the moment itself for search.
       final vectors = await openai.embed(
-        batch.map((e) => _embedText(e.contextText)).toList(growable: false),
+        [
+          for (final e in batch) _embedText(e.contextText),
+          for (final e in batch)
+            _embedText(StoredExchange.focusTextOf(e.context, e.replyText)),
+        ],
         model: embeddingModel,
         dimensions: dimensions,
       );
@@ -248,6 +255,7 @@ class StyleMemoryService {
             contextText: exchange.contextText,
             replyText: exchange.replyText,
             vector: _unit(vectors[i]),
+            focus: _unit(vectors[batch.length + i]),
             timestamp: exchange.timestamp,
             hash: StoredExchange.hashOf(exchange),
           ),
@@ -426,7 +434,10 @@ class StyleMemoryService {
     if ((await store.hashesFor(chat.id)).contains(hash)) return chat;
 
     final vectors = await openai.embed(
-      [_embedText(contextText)],
+      [
+        _embedText(contextText),
+        _embedText(StoredExchange.focusTextOf(context, text)),
+      ],
       model: chat.embeddingModel,
       dimensions: chat.dimensions,
     );
@@ -439,6 +450,7 @@ class StyleMemoryService {
           contextText: contextText,
           replyText: text,
           vector: _unit(vectors.first),
+          focus: _unit(vectors.last),
           timestamp: DateTime.now(),
           hash: hash,
           source: ExchangeSource.saved,
@@ -448,6 +460,62 @@ class StyleMemoryService {
   }
 
   static Float32List _unit(List<double> values) => VectorMath.normalise(values);
+
+  /// How many of [chatIds]' exchanges, built with [embeddingModel] at
+  /// [dimensions], have no search fingerprint yet.
+  Future<int> missingFocus({
+    required Set<int> chatIds,
+    required String embeddingModel,
+    required int dimensions,
+  }) async => (await _withoutFocus(chatIds, embeddingModel, dimensions)).length;
+
+  Future<List<StoredExchange>> _withoutFocus(
+    Set<int> chatIds,
+    String embeddingModel,
+    int dimensions,
+  ) async {
+    final usable = {
+      for (final c in await store.chats())
+        if (chatIds.contains(c.id) && c.matches(embeddingModel, dimensions))
+          c.id,
+    };
+    if (usable.isEmpty) return const [];
+    return [
+      for (final e in await store.all(chatIds: usable))
+        if (e.focus == null) e,
+    ];
+  }
+
+  /// Makes the search fingerprints that chats imported before they existed
+  /// are missing. One cheap embedding call per [embedBatchSize] × 2.
+  Future<int> addFocus({
+    required Set<int> chatIds,
+    required String embeddingModel,
+    required int dimensions,
+    void Function(int done, int of)? onProgress,
+    bool Function()? isCancelled,
+  }) async {
+    final todo = await _withoutFocus(chatIds, embeddingModel, dimensions);
+    final batchSize = embedBatchSize * 2;
+    onProgress?.call(0, todo.length);
+    for (var start = 0; start < todo.length; start += batchSize) {
+      if (isCancelled?.call() ?? false) throw const StyleMemoryCancelled();
+      final batch = todo.sublist(
+        start,
+        math.min(start + batchSize, todo.length),
+      );
+      final vectors = await openai.embed(
+        [for (final e in batch) _embedText(e.focusText)],
+        model: embeddingModel,
+        dimensions: dimensions,
+      );
+      await store.saveFocus({
+        for (var i = 0; i < batch.length; i++) batch[i].id: _unit(vectors[i]),
+      });
+      onProgress?.call(start + batch.length, todo.length);
+    }
+    return todo.length;
+  }
 
   /// Keeps the tail of a long context: the most recent turns are what a reply
   /// actually responds to.

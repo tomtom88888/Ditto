@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../models/stored_exchange.dart';
 import '../models/suggestion_feedback.dart';
 import 'exchange_store.dart';
@@ -82,6 +84,14 @@ class MemoryExchangeStore implements ExchangeStore {
   @override
   Future<int> count({Set<int>? chatIds}) async =>
       (await all(chatIds: chatIds)).length;
+
+  @override
+  Future<void> saveFocus(Map<int, Float32List> focus) async {
+    for (var i = 0; i < rows.length; i++) {
+      final f = focus[rows[i].id];
+      if (f != null) rows[i] = rows[i].copyWith(focus: f);
+    }
+  }
 
   @override
   Future<List<StoredExchange>> all({Set<int>? chatIds}) async => [

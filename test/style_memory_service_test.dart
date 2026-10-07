@@ -111,10 +111,12 @@ void main() {
         onProgress: progress.add,
       );
 
-      expect(batchSizes, [96, 96, 8]);
+      // 48 exchanges a request, each sending its context and its moment.
+      expect(batchSizes, [96, 96, 96, 96, 16]);
       expect(store.rows, hasLength(200));
       expect(progress.first.embedded, 0);
-      expect(progress.map((p) => p.embedded), contains(96));
+      expect(progress.map((p) => p.embedded), contains(48));
+      expect(store.rows.every((r) => r.focus != null), isTrue);
       expect(progress.last.embedded, 200);
       expect(progress.last.fraction, 1.0);
     });
@@ -306,7 +308,7 @@ void main() {
         exchange('where', 'the usual'),
       ]);
 
-      expect(embedded, ['Sam: where']);
+      expect(embedded, ['Sam: where', 'Sam: where\nMe: the usual']);
       expect(second.id, first.id, reason: 'same chat, not a new one');
       expect(second.exchangeCount, 3);
       expect(await store.chats(), hasLength(1));
@@ -514,7 +516,8 @@ void main() {
         contextTurns: 4,
       );
 
-      expect(calls, 1, reason: 'the same save twice is ignored');
+      // One save embeds the context and the moment; the second is ignored.
+      expect(calls, 2, reason: 'the same save twice is ignored');
       final row = store.rows.single;
       expect(row.source, ExchangeSource.saved);
       expect(row.context, hasLength(4));

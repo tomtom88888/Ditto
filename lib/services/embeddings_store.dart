@@ -37,7 +37,7 @@ class SqfliteExchangeStore implements ExchangeStore {
   ///     feedback log.
   /// v3: each chat's numbers for the chat data screen.
   /// v4: whether a chat is a group chat.
-  static const int schemaVersion = 6;
+  static const int schemaVersion = 7;
 
   Database? _database;
   final Map<int, List<StoredExchange>> _cache = {};
@@ -62,6 +62,7 @@ class SqfliteExchangeStore implements ExchangeStore {
           if (from < 4) await _upgradeToV4(db);
           if (from < 5) await _upgradeToV5(db);
           if (from < 6) await _upgradeToV6(db);
+          if (from < 7) await _upgradeToV7(db);
         },
       ),
     );
@@ -108,7 +109,13 @@ class SqfliteExchangeStore implements ExchangeStore {
     if (version >= 3) await _upgradeToV3(db);
     if (version >= 4) await _upgradeToV4(db);
     if (version >= 5) await _upgradeToV5(db);
+    if (version >= 7) await _upgradeToV7(db);
   }
+
+  /// Room for each exchange's search fingerprint, filled in by the next
+  /// import or the first search.
+  static Future<void> _upgradeToV7(DatabaseExecutor db) =>
+      db.execute('ALTER TABLE exchanges ADD COLUMN focus BLOB');
 
   /// Finds the Instagram chats imported before the app was recorded.
   /// Instagram stamps messages to the millisecond; a WhatsApp export never
@@ -328,6 +335,9 @@ class SqfliteExchangeStore implements ExchangeStore {
           'reply': exchange.replyText,
           'ts': exchange.timestamp?.millisecondsSinceEpoch,
           'vector': VectorMath.encode(exchange.vector),
+          'focus': exchange.focus == null
+              ? null
+              : VectorMath.encode(exchange.focus!),
         });
       }
       await batch.commit(noResult: true);
@@ -413,6 +423,28 @@ class SqfliteExchangeStore implements ExchangeStore {
     final out = <StoredExchange>[for (final id in wanted) ...?_cache[id]]
       ..sort((a, b) => a.id.compareTo(b.id));
     return out;
+  }
+
+  @override
+  Future<void> saveFocus(Map<int, Float32List> focus) async {
+    if (focus.isEmpty) return;
+    final db = await _open();
+    final batch = db.batch();
+    for (final e in focus.entries) {
+      batch.update(
+        'exchanges',
+        {'focus': VectorMath.encode(e.value)},
+        where: 'id = ?',
+        whereArgs: [e.key],
+      );
+    }
+    await batch.commit(noResult: true);
+    for (final rows in _cache.values) {
+      for (var i = 0; i < rows.length; i++) {
+        final f = focus[rows[i].id];
+        if (f != null) rows[i] = rows[i].copyWith(focus: f);
+      }
+    }
   }
 
   static String? _inClause(Set<int>? ids) => ids == null
@@ -511,6 +543,9 @@ class SqfliteExchangeStore implements ExchangeStore {
       contextText: row['context_text']! as String,
       replyText: row['reply']! as String,
       vector: VectorMath.decode(row['vector']! as Uint8List),
+      focus: row['focus'] is Uint8List
+          ? VectorMath.decode(row['focus']! as Uint8List)
+          : null,
       timestamp: ts is num
           ? DateTime.fromMillisecondsSinceEpoch(ts.toInt())
           : null,

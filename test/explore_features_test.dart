@@ -272,87 +272,74 @@ void main() {
       expect(hits.last.wordMatch, isFalse);
     });
 
-    test('the model keeps only real matches, best first, with why', () async {
-      final sent = <Map<String, Object?>>[];
-      final store = MemoryExchangeStore(
-        chats: [chat()],
-        rows: [
-          exchange(id: 1, vector: [1, 0], reply: 'see you there'),
-          exchange(
-            id: 2,
-            vector: [0.9, 0.1],
-            context: [turn('Maya', 'the ramen place on 5th was unreal')],
-            reply: 'we have to go back',
-          ),
-          exchange(id: 3, vector: [0.8, 0.2], reply: 'lol'),
-        ],
-      );
-      final search = ChatSearch(
-        openai: fake(
-          sent: sent,
-          embed: (_) => [1, 0],
-          answer: (_) =>
-              '{"matches": [{"id": 2, "score": 4, "why": "x"}, '
-              '{"id": 0, "score": 9, "why": "she raves about ramen"}]}',
-        ),
-        store: store,
-      );
-      final hits = await search.search(
-        'that ramen place',
-        chatIds: {1},
-        embeddingModel: 'text-embedding-3-small',
-        dimensions: 2,
-        model: 'gpt-5.6-terra',
-      );
-      // Shortlisted as 2 (its words match), 1, 3. The model kept the first,
-      // the ramen moment, and dropped the one it scored 4; 1 it left out.
-      expect(hits.map((h) => h.exchange.id), [2]);
-      expect(hits.single.why, 'she raves about ramen');
-      expect(hits.single.score, 0.9);
-      expect(sent, hasLength(2), reason: 'one embedding, one reading');
-      final prompt =
-          ((sent.last['messages']! as List).last as Map)['content'] as String;
-      expect(prompt, contains('Looking for: that ramen place'));
-      expect(prompt, contains('Me: we have to go back'));
+    // Twenty moments that all sit at much the same distance from the query,
+    // the way chat text does, around one that is clearly closer.
+    List<StoredExchange> crowd() => [
+      for (var i = 0; i < 20; i++)
+        exchange(id: 100 + i, vector: [0.3 + (i % 5) * 0.01, 1], reply: 'ok'),
+    ];
+
+    test('only moments that stand out from the rest are shown', () {
+      final query = VectorMath.normalise([1, 0]);
+      final hits = ChatSearch.rank(query, 'anything', [
+        ...crowd(),
+        exchange(id: 1, vector: [1, 0.15], reply: 'that one'),
+      ]);
+      expect(hits.map((h) => h.exchange.id), [1]);
+      expect(hits.single.weak, isFalse);
     });
 
-    test('if the reading fails, the plain ranking is shown', () async {
-      final store = MemoryExchangeStore(
-        chats: [chat()],
-        rows: [
-          exchange(id: 1, vector: [1, 0]),
-          exchange(id: 2, vector: [-1, 0]),
-        ],
-      );
-      final search = ChatSearch(
-        openai: OpenAiService(
-          apiKey: 'sk-test-0123456789abcdefghij',
-          maxRetries: 0,
-          client: MockClient((request) async {
-            if (request.url.path.endsWith('/embeddings')) {
-              return json({
-                'data': [
-                  {
-                    'index': 0,
-                    'embedding': [1, 0],
-                  },
-                ],
-              });
-            }
-            return http.Response('{"error": {"message": "nope"}}', 400);
-          }),
-        ),
-        store: store,
-      );
-      final hits = await search.search(
-        'x',
-        chatIds: {1},
-        embeddingModel: 'text-embedding-3-small',
-        dimensions: 2,
-        model: 'gpt-5.6-terra',
-      );
+    test('when nothing stands out, the closest three come back as weak', () {
+      final query = VectorMath.normalise([1, 0]);
+      final hits = ChatSearch.rank(query, 'anything', crowd());
+      expect(hits, hasLength(3));
+      expect(hits.every((h) => h.weak), isTrue);
+    });
+
+    test('the tight moment fingerprint is matched before the wide one', () {
+      final query = VectorMath.normalise([1, 0]);
+      final hits = ChatSearch.rank(query, 'anything', [
+        ...crowd(),
+        // Its ten-turn fingerprint looks like the crowd; the moment itself
+        // is what was asked for.
+        exchange(
+          id: 1,
+          vector: [0.3, 1],
+        ).copyWith(focus: VectorMath.normalise([1, 0.1])),
+      ]);
       expect(hits.map((h) => h.exchange.id), [1]);
-      expect(hits.single.why, isNull);
+    });
+
+    test('a rare word matches on its own; a common one does not', () {
+      final query = VectorMath.normalise([0, 1]);
+      final rows = [
+        for (var i = 0; i < 20; i++)
+          exchange(
+            id: 100 + i,
+            vector: [1, 0.3 + (i % 5) * 0.01],
+            context: [turn('Maya', 'see you later then')],
+          ),
+        exchange(
+          id: 1,
+          vector: [1, 0.3],
+          context: [turn('Maya', 'the ramen in Osaka, see you there')],
+        ),
+      ];
+      expect(ChatSearch.rank(query, 'osaka', rows).map((h) => h.exchange.id), [
+        1,
+      ]);
+      // "see" is everywhere: no moment stands out by it.
+      expect(ChatSearch.rank(query, 'see', rows).first.weak, isTrue);
+    });
+
+    test('Bm25 weighs rare words more and matches word starts', () {
+      final scores = Bm25([
+        ['plans', 'for', 'friday'],
+        ['friday', 'friday'],
+        ['nothing'],
+      ]).scores(['plan', 'friday']);
+      expect(scores[0], greaterThan(scores[1]));
+      expect(scores[2], 0);
     });
 
     test('one embedding call per search', () async {
@@ -480,10 +467,9 @@ void main() {
       tester,
       const SearchScreen(),
       store: store,
+      // The one-time search fingerprints are made on opening, from the text.
       openai: fake(
-        embed: (_) => [1, 0],
-        answer: (_) =>
-            '{"matches": [{"id": 0, "score": 9, "why": "raves about ramen"}]}',
+        embed: (input) => input.contains('football') ? [-1, 0] : [1, 0],
       ),
     );
     // The box grows with what is typed, a line at a time.
@@ -502,7 +488,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('1 moment, best match first'), findsOneWidget);
-    expect(find.text('raves about ramen'), findsOneWidget);
     expect(find.text('that ramen place was unreal'), findsOneWidget);
     expect(find.text('we have to go back'), findsOneWidget);
     expect(find.textContaining('14 Feb 2026'), findsOneWidget);
