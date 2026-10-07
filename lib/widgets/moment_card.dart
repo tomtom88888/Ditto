@@ -26,10 +26,10 @@ class MomentCard extends StatefulWidget {
   final String myName;
 
   @override
-  State<MomentCard> createState() => MomentCardState();
+  State<MomentCard> createState() => _MomentCardState();
 }
 
-class MomentCardState extends State<MomentCard> {
+class _MomentCardState extends State<MomentCard> {
   bool _open = false;
 
   static const int _collapsed = 3;

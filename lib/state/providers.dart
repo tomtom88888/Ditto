@@ -5,6 +5,7 @@ import '../models/api_usage.dart';
 import '../models/app_settings.dart';
 import '../models/stored_exchange.dart';
 import '../models/suggestion_feedback.dart';
+import '../services/ask_chats.dart';
 import '../services/chat_facts.dart';
 import '../services/chat_groupings.dart';
 import '../services/chat_search.dart';
@@ -168,6 +169,13 @@ final chatSearchProvider = Provider<ChatSearch?>((ref) {
   final openai = ref.watch(openAiServiceProvider);
   if (openai == null) return null;
   return ChatSearch(openai: openai, store: ref.watch(exchangeStoreProvider));
+});
+
+final askChatsProvider = Provider<AskChats?>((ref) {
+  final openai = ref.watch(openAiServiceProvider);
+  final search = ref.watch(chatSearchProvider);
+  if (openai == null || search == null) return null;
+  return AskChats(openai: openai, search: search);
 });
 
 final fineTuneServiceProvider = Provider<FineTuneService?>((ref) {

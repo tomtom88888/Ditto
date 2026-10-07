@@ -459,6 +459,31 @@ class StyleMemoryService {
     );
   }
 
+  /// How [chat] ended the last time you talked: the lead-up to your latest
+  /// reply, then that reply.
+  Future<List<ChatTurn>> latestTurns(ChatMemory chat) async {
+    final rows = await store.all(chatIds: {chat.id});
+    StoredExchange? latest;
+    for (final r in rows) {
+      final at = r.timestamp;
+      if (at == null) continue;
+      final best = latest?.timestamp;
+      if (best == null || at.isAfter(best)) latest = r;
+    }
+    latest ??= rows.isEmpty ? null : rows.last;
+    if (latest == null) return const [];
+    return [
+      ...latest.context,
+      ChatTurn(
+        sender: chat.myName,
+        text: latest.replyText,
+        messageCount: '\n'.allMatches(latest.replyText.trim()).length + 1,
+        firstTimestamp: latest.timestamp,
+        lastTimestamp: latest.timestamp,
+      ),
+    ];
+  }
+
   static Float32List _unit(List<double> values) => VectorMath.normalise(values);
 
   /// How many of [chatIds]' exchanges, built with [embeddingModel] at

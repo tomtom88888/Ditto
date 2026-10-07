@@ -15,13 +15,17 @@ import '../widgets/failure_text.dart';
 import '../widgets/format.dart';
 import '../widgets/paper_dialog.dart';
 import '../widgets/paper_ui.dart';
-import 'generate_screen.dart';
+import 'ask_screen.dart';
 import 'chat_data_screen.dart';
 import 'chat_groupings_screen.dart';
+import 'check_screen.dart';
 import 'facts_screen.dart';
+import 'generate_screen.dart';
+import 'openers_screen.dart';
 import 'search_screen.dart';
 import 'settings_screen.dart';
 import 'train_screen.dart';
+import 'trends_screen.dart';
 
 /// What the app knows, which of it to use, and the things you can do.
 class HomeScreen extends ConsumerStatefulWidget {
@@ -200,12 +204,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       tone: NoticeTone.caution,
                       title: 'Needs rebuilding',
                     ),
-                  _Explore(
-                    onChatData: () => _push(const ChatDataScreen()),
-                    onGroupings: () => _push(const ChatGroupingsScreen()),
-                    onSearch: () => _push(const SearchScreen()),
-                    onRemember: () => _push(const FactsScreen()),
-                  ),
+                  _Explore(open: (screen) => _push(screen)),
                   if (settings.mode == TrainingMode.fineTune &&
                       !settings.hasFineTunedModel)
                     _FineTuneMismatch(onFix: openSettings),
@@ -531,20 +530,63 @@ class _AddChatRow extends StatelessWidget {
 
 /// The ways to look at what has been learned, two to a row.
 class _Explore extends StatelessWidget {
-  const _Explore({
-    required this.onChatData,
-    required this.onGroupings,
-    required this.onSearch,
-    required this.onRemember,
-  });
+  const _Explore({required this.open});
 
-  final VoidCallback onChatData;
-  final VoidCallback onGroupings;
-  final VoidCallback onSearch;
-  final VoidCallback onRemember;
+  /// Opens a screen.
+  final ValueChanged<Widget> open;
 
   @override
   Widget build(BuildContext context) {
+    final tiles = [
+      _Tile(
+        icon: Icons.question_answer_outlined,
+        title: 'Ask your chats',
+        subtitle: 'Questions, answered from them',
+        onTap: () => open(const AskScreen()),
+      ),
+      _Tile(
+        icon: Icons.waving_hand_outlined,
+        title: 'Start a chat',
+        subtitle: 'When it’s gone quiet',
+        onTap: () => open(const OpenersScreen()),
+      ),
+      _Tile(
+        icon: Icons.spellcheck_rounded,
+        title: 'Check my message',
+        subtitle: 'Does it sound like you?',
+        onTap: () => open(const CheckScreen()),
+      ),
+      _Tile(
+        icon: Icons.trending_up_rounded,
+        title: 'How it’s going',
+        subtitle: 'Warming up or cooling off',
+        onTap: () => open(const TrendsScreen()),
+      ),
+      _Tile(
+        icon: Icons.search_rounded,
+        title: 'Search',
+        subtitle: 'Find a moment by meaning',
+        onTap: () => open(const SearchScreen()),
+      ),
+      _Tile(
+        icon: Icons.favorite_border_rounded,
+        title: 'Remember',
+        subtitle: 'Things they’ve told you',
+        onTap: () => open(const FactsScreen()),
+      ),
+      _Tile(
+        icon: Icons.insights_rounded,
+        title: 'Chat data',
+        subtitle: 'Reply times, word counts',
+        onTap: () => open(const ChatDataScreen()),
+      ),
+      _Tile(
+        icon: Icons.bubble_chart_outlined,
+        title: 'Chat groupings',
+        subtitle: 'What you talk about',
+        onTap: () => open(const ChatGroupingsScreen()),
+      ),
+    ];
     // Equal heights, so each pair of tiles reads as one row.
     Widget pair(Widget a, Widget b) => IntrinsicHeight(
       child: Row(
@@ -561,35 +603,10 @@ class _Explore extends StatelessWidget {
       children: [
         const MonoLabel('Look closer'),
         const SizedBox(height: 9),
-        pair(
-          _Tile(
-            icon: Icons.insights_rounded,
-            title: 'Chat data',
-            subtitle: 'Reply times, word counts',
-            onTap: onChatData,
-          ),
-          _Tile(
-            icon: Icons.bubble_chart_outlined,
-            title: 'Chat groupings',
-            subtitle: 'What you talk about',
-            onTap: onGroupings,
-          ),
-        ),
-        const SizedBox(height: 10),
-        pair(
-          _Tile(
-            icon: Icons.search_rounded,
-            title: 'Search',
-            subtitle: 'Find a moment by meaning',
-            onTap: onSearch,
-          ),
-          _Tile(
-            icon: Icons.favorite_border_rounded,
-            title: 'Remember',
-            subtitle: 'Things they’ve told you',
-            onTap: onRemember,
-          ),
-        ),
+        for (var i = 0; i < tiles.length; i += 2) ...[
+          if (i > 0) const SizedBox(height: 10),
+          pair(tiles[i], tiles[i + 1]),
+        ],
       ],
     );
   }

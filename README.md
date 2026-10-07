@@ -24,9 +24,20 @@ AI provider you choose (OpenAI, Claude or Gemini), made with your own key.
   the exam next week, what they hate) from across the whole chat, so replies
   can call back to them.
 - **Search.** Find a moment by describing it in your own words ("that place
-  she wanted to go"). Fingerprints shortlist the closest 40 moments, then
-  your writing model reads them and keeps only the real matches, each with a
-  line saying why.
+  she wanted to go"). One embedding call; the ranking happens on the phone,
+  using a tight fingerprint of each moment, keyword scoring (BM25), and only
+  showing moments that clearly stand out from the rest.
+- **Ask your chats.** Ask a question ("when did we first talk about
+  moving?") and get a short answer citing the moments it came from.
+- **Start a chat.** When a chat has gone quiet, openers in your voice that
+  follow up on how it ended and what you know about them.
+- **Check my message.** Paste a message you wrote: it's compared with how
+  you usually text that person (length, capitals, full stops, emoji,
+  questions, bubbles), with a free quick fix and an optional rewrite in your
+  voice.
+- **How it's going.** Month by month: how much you each write, how fast they
+  answer, who starts conversations, and whether it's warming up or cooling
+  off. Counted on the phone, no API calls.
 - **Chat groupings.** Groups your replies by what was being talked about,
   names each group, draws them on a map, and shows how topics change over
   time.
@@ -195,7 +206,7 @@ app stored, optionally including the keys.
 git clone https://github.com/tomtom88888/ChatingTools.git
 cd ChatingTools
 flutter pub get
-flutter test          # 344 tests, no network or device needed
+flutter test          # 361 tests, no network or device needed
 flutter run
 ```
 
@@ -267,7 +278,7 @@ lib/
   theme/                     palettes, type, and per-app bubble colours
   widgets/                   shared UI kit, export guides, job cards, tray
 android/.../MainActivity.kt  keeps the Flutter engine beyond the screen
-test/                        344 unit and widget tests
+test/                        361 unit and widget tests
 test/fixtures/               invented Android and iOS exports
 docs/business-plan.txt       backlog: how it could be sold one day
 ```
@@ -278,7 +289,7 @@ docs/business-plan.txt       backlog: how it could be sold one day
 flutter test
 ```
 
-344 tests, none needing a network or device. They cover both parsers
+361 tests, none needing a network or device. They cover both parsers
 (including Instagram's encoding repair and multi-file threads), the
 OpenAI/Claude/Gemini request and response shapes, error mapping, retries and
 resuming after the app was away, retrieval and the vector maths, prompt

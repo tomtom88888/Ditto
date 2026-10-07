@@ -189,6 +189,90 @@ class ReplyGenerator {
     return StyleConformer.rank(cleaned, profile).take(keep).toList();
   }
 
+  /// Messages to start the chat with [settings.theirName] again after it
+  /// went quiet: [count] options in your voice, drawing on [facts] and the
+  /// [recent] end of the chat, nudged by [note].
+  Future<List<String>> openers({
+    required AppSettings settings,
+    required List<ChatTurn> recent,
+    StyleProfile profile = StyleProfile.empty,
+    List<String> voiceSample = const [],
+    List<String> facts = const [],
+    String note = '',
+    String quietFor = '',
+    bool group = false,
+    int count = 3,
+  }) async {
+    final me = _name(settings.myName, 'the user');
+    final them = _name(settings.theirName, 'them');
+    final system = buildSystemPrompt(
+      settings,
+      profile: profile,
+      voiceSample: voiceSample,
+      note: note,
+      hasExamples: false,
+      group: group,
+      earlier: recent,
+      earlierIntro: 'How the chat with $them went the last time you talked:',
+      facts: facts,
+      extra:
+          'There is no new message to answer: the chat has gone quiet'
+          '${quietFor.isEmpty ? "" : " for $quietFor"}. Write one message $me '
+          'could send to start it up again with $them. Make it easy to '
+          'answer and specific to the two of them: follow up on something '
+          'from the end of the chat or from what $me knows about $them, or '
+          'open something new they would enjoy. No "hey stranger", no '
+          'apologising for the silence unless $me would.',
+    );
+    final drafts = await _bestDrafts(
+      [
+        {'role': 'system', 'content': system},
+        {'role': 'user', 'content': 'Write the message $me sends to $them.'},
+      ],
+      settings: settings,
+      profile: profile,
+      keep: count,
+    );
+    return drafts;
+  }
+
+  /// [draft], a message you wrote yourself, rewritten to sound like you
+  /// write to [settings.theirName], saying the same thing. Two options.
+  Future<List<String>> rewriteMine({
+    required String draft,
+    required AppSettings settings,
+    StyleProfile profile = StyleProfile.empty,
+    List<String> voiceSample = const [],
+    List<ChatTurn> recent = const [],
+    bool group = false,
+  }) async {
+    final me = _name(settings.myName, 'the user');
+    final system = buildSystemPrompt(
+      settings,
+      profile: profile,
+      voiceSample: voiceSample,
+      hasExamples: false,
+      group: group,
+      earlier: recent,
+      earlierIntro: 'The end of the chat so far, for background:',
+      extra:
+          '$me has written the message in the last user message and wants '
+          'it to sound like them. Rewrite it so it says the same thing, '
+          'with nothing added or left out, in exactly the way $me writes: '
+          'length, casing, punctuation, slang, emoji and bubbles. Send only '
+          'the rewritten message.',
+    );
+    return _bestDrafts(
+      [
+        {'role': 'system', 'content': system},
+        {'role': 'user', 'content': draft.trim()},
+      ],
+      settings: settings,
+      profile: profile,
+      keep: 2,
+    );
+  }
+
   /// Rewrites one suggestion according to [refinement], keeping what it is
   /// for: a topic change stays a topic change.
   Future<ReplySuggestion> refine({
@@ -366,6 +450,7 @@ class ReplyGenerator {
     List<ChatTurn> earlier = const [],
     List<String> facts = const [],
     String? extra,
+    String? earlierIntro,
   }) {
     final me = settings.myName.isEmpty ? 'the user' : settings.myName;
     final name = settings.theirName;
@@ -410,9 +495,9 @@ class ReplyGenerator {
         named: group,
       );
       section(
-        'Earlier in this same conversation, before the part in the last user '
-        'message (background only — what $me writes answers the latest '
-        'messages):\n$background',
+        '${earlierIntro ?? "Earlier in this same conversation, before the "
+                "part in the last user message (background only — what $me "
+                "writes answers the latest messages):"}\n$background',
       );
     }
 
