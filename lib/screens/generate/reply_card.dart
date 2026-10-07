@@ -5,6 +5,7 @@ import '../../services/reply_generator.dart';
 import '../../models/chat_app.dart';
 import '../../theme/bubbles.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/bidi.dart';
 
 /// One suggested message: what it is for, its bubbles, and what can be done
 /// with it — copy, tweak, or star it into the memory.
@@ -264,6 +265,7 @@ class _Bubble extends StatelessWidget {
             widthFactor: 1,
             child: Text(
               text,
+              textDirection: directionOf(text),
               style: Type.prose(
                 size: 15.5,
                 color: Bubbles.of(app).mineText,

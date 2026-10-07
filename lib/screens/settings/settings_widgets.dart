@@ -4,6 +4,7 @@ import '../../models/app_settings.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/paper_dialog.dart';
 import '../../widgets/paper_ui.dart';
+import '../../widgets/bidi.dart';
 
 class TapRow extends StatelessWidget {
   const TapRow({
@@ -427,16 +428,21 @@ class _SystemPromptFieldState extends State<SystemPromptField> {
         ],
       ),
       const SizedBox(height: 7),
-      TextField(
+      AutoDirection(
         controller: _controller,
-        focusNode: _focus,
-        maxLines: null,
-        minLines: 6,
-        textCapitalization: TextCapitalization.sentences,
-        style: Type.prose(size: 13, color: Paper.ink, height: 1.5),
-        decoration: paperFieldDecoration('The instructions the model follows'),
-        onTapOutside: (_) => _commit(),
-        onEditingComplete: _commit,
+        builder: (context) => TextField(
+          controller: _controller,
+          focusNode: _focus,
+          maxLines: null,
+          minLines: 6,
+          textCapitalization: TextCapitalization.sentences,
+          style: Type.prose(size: 13, color: Paper.ink, height: 1.5),
+          decoration: paperFieldDecoration(
+            'The instructions the model follows',
+          ),
+          onTapOutside: (_) => _commit(),
+          onEditingComplete: _commit,
+        ),
       ),
       const SizedBox(height: 6),
       Text(

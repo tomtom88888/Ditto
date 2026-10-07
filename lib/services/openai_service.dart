@@ -838,16 +838,22 @@ class OpenAiService {
 
   static const String _visionSystemPrompt =
       'You transcribe screenshots of a chat: WhatsApp, or Instagram direct '
-      "messages. In both, the user's own messages are the bubbles aligned to "
-      'the RIGHT edge of the screen (WhatsApp: green or blue-tinted; '
-      'Instagram: purple, blue or a gradient), and the other person\'s '
-      'messages are the bubbles aligned to the LEFT edge (white or grey, on '
-      'Instagram often with their small profile picture beside them). '
-      'Alignment decides the sender, never the wording. Transcribe the visible '
-      'messages in top-to-bottom order, exactly as written, keeping emoji, '
-      'capitalisation, spelling and language as they appear. Ignore date '
-      'separators, timestamps, read receipts ("Seen"), reactions under a '
-      'bubble, the contact header and the input box.\n\n'
+      "messages. The user's own messages are the coloured bubbles: WhatsApp's "
+      'green (light green, or dark teal in dark mode) with tick marks, and '
+      "Instagram's purple, blue or gradient. The other person's are the white "
+      'or grey bubbles, on Instagram often with their small profile picture '
+      'beside them. Normally the user\'s bubbles sit on the RIGHT and the '
+      'other person\'s on the LEFT, but when the app is in a right-to-left '
+      'language (its interface in Hebrew, Arabic, Persian or Urdu: the header, '
+      'dates and "typing" text read right to left) the whole screen is '
+      'mirrored and the user\'s bubbles are on the LEFT. So decide the sender '
+      'by bubble colour and tick marks first, and use the side only together '
+      'with the interface\'s language, never by the wording. Transcribe the '
+      'visible messages in top-to-bottom order, exactly as written, keeping '
+      'emoji, capitalisation, spelling, language and the order of words in '
+      'right-to-left text as they appear. Ignore date separators, timestamps, '
+      'read receipts ("Seen"), reactions under a bubble, the contact header '
+      'and the input box.\n\n'
       'Replies: a bubble that replies to an earlier message has a small quoted '
       'box at its top, with a coloured bar down one side, the quoted '
       "sender's name, and the quoted text (often cut short with \u2026). That "
@@ -861,18 +867,19 @@ class OpenAiService {
       'name at its top, often in colour (a run of bubbles from one person '
       'may show it only on the first). Put that name in "name" for every '
       'one of their bubbles — repeat it down a run — and never in "text". '
-      'Leave "name" out in a one-to-one chat and for right-aligned bubbles.\n\n'
+      'Leave "name" out in a one-to-one chat and for the user\'s own '
+      'bubbles.\n\n'
       'Reply with JSON only.';
 
   static const String _visionUserPrompt =
       'Transcribe this conversation. Respond with a JSON object of the form '
       '{"messages": [{"sender": "me" | "them", "text": "...", '
-      '"quoted": "...", "name": "..."}]} where "me" is a right-aligned bubble '
-      'and "them" is a left-aligned bubble. Include "quoted" only for a bubble '
-      'that replies to another message, and "name" only for a left-aligned '
-      'bubble in a group chat. If a bubble is only an image, sticker or voice '
-      'note, use its text as an empty string. Output nothing but the JSON '
-      'object.';
+      '"quoted": "...", "name": "..."}]} where "me" is one of the user\'s own '
+      'bubbles and "them" is one of the other side\'s. Include "quoted" only '
+      'for a bubble that replies to another message, and "name" only for the '
+      "other side's bubbles in a group chat. If a bubble is only an image, "
+      'sticker or voice note, use its text as an empty string. Output nothing '
+      'but the JSON object.';
 
   /// Validates and parses the vision model's JSON.
   ///

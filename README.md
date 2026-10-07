@@ -206,7 +206,7 @@ app stored, optionally including the keys.
 git clone https://github.com/tomtom88888/ChatingTools.git
 cd ChatingTools
 flutter pub get
-flutter test          # 361 tests, no network or device needed
+flutter test          # 366 tests, no network or device needed
 flutter run
 ```
 
@@ -278,7 +278,7 @@ lib/
   theme/                     palettes, type, and per-app bubble colours
   widgets/                   shared UI kit, export guides, job cards, tray
 android/.../MainActivity.kt  keeps the Flutter engine beyond the screen
-test/                        361 unit and widget tests
+test/                        366 unit and widget tests
 test/fixtures/               invented Android and iOS exports
 docs/business-plan.txt       backlog: how it could be sold one day
 ```
@@ -289,7 +289,7 @@ docs/business-plan.txt       backlog: how it could be sold one day
 flutter test
 ```
 
-361 tests, none needing a network or device. They cover both parsers
+366 tests, none needing a network or device. They cover both parsers
 (including Instagram's encoding repair and multi-file threads), the
 OpenAI/Claude/Gemini request and response shapes, error mapping, retries and
 resuming after the app was away, retrieval and the vector maths, prompt

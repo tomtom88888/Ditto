@@ -5,6 +5,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/failure_text.dart';
 import '../../widgets/format.dart';
 import '../../widgets/paper_ui.dart';
+import '../../widgets/bidi.dart';
 
 /// The top bar: back, who you are replying to, and a new source.
 class GenerateHeader extends StatelessWidget {
@@ -324,34 +325,37 @@ class NoteField extends StatelessWidget {
     children: [
       const MonoLabel('Anything it should know', spacing: 0.12),
       const SizedBox(height: 8),
-      TextField(
+      AutoDirection(
         controller: controller,
-        maxLines: null,
-        minLines: 2,
-        textCapitalization: TextCapitalization.sentences,
-        style: Type.prose(size: 14, color: Paper.ink, height: 1.45),
-        onTapOutside: (_) => onCommit(),
-        onEditingComplete: onCommit,
-        decoration: InputDecoration(
-          isDense: true,
-          filled: true,
-          fillColor: Paper.card,
-          hintText:
-              "say I'll be late \u00b7 keep it short \u00b7 ask about "
-              'the weekend',
-          hintStyle: Type.prose(size: 14, color: Paper.placeholder),
-          contentPadding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          border: OutlineInputBorder(
-            borderRadius: Corner.all(Corner.small),
-            borderSide: BorderSide(color: Paper.border, width: 1.5),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: Corner.all(Corner.small),
-            borderSide: BorderSide(color: Paper.border, width: 1.5),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: Corner.all(Corner.small),
-            borderSide: BorderSide(color: Paper.accent, width: 1.5),
+        builder: (context) => TextField(
+          controller: controller,
+          maxLines: null,
+          minLines: 2,
+          textCapitalization: TextCapitalization.sentences,
+          style: Type.prose(size: 14, color: Paper.ink, height: 1.45),
+          onTapOutside: (_) => onCommit(),
+          onEditingComplete: onCommit,
+          decoration: InputDecoration(
+            isDense: true,
+            filled: true,
+            fillColor: Paper.card,
+            hintText:
+                "say I'll be late \u00b7 keep it short \u00b7 ask about "
+                'the weekend',
+            hintStyle: Type.prose(size: 14, color: Paper.placeholder),
+            contentPadding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            border: OutlineInputBorder(
+              borderRadius: Corner.all(Corner.small),
+              borderSide: BorderSide(color: Paper.border, width: 1.5),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: Corner.all(Corner.small),
+              borderSide: BorderSide(color: Paper.border, width: 1.5),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: Corner.all(Corner.small),
+              borderSide: BorderSide(color: Paper.accent, width: 1.5),
+            ),
           ),
         ),
       ),

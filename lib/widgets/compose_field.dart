@@ -5,6 +5,7 @@ import '../models/chat_app.dart';
 import '../theme/bubbles.dart';
 import '../theme/tokens.dart';
 import 'failure_text.dart';
+import 'bidi.dart';
 
 /// A text box that grows a line at a time as you write, with an optional
 /// button at its end, by the last line.
@@ -46,20 +47,23 @@ class ComposeField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Expanded(
-          child: TextField(
-            key: fieldKey,
+          child: AutoDirection(
             controller: controller,
-            enabled: enabled,
-            minLines: 1,
-            maxLines: maxLines,
-            onChanged: onChanged,
-            keyboardType: TextInputType.multiline,
-            textInputAction: TextInputAction.newline,
-            style: Type.prose(size: 15, color: Paper.ink, height: 1.4),
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              hintText: hint,
-              hintStyle: Type.prose(size: 15, color: Paper.placeholder),
+            builder: (context) => TextField(
+              key: fieldKey,
+              controller: controller,
+              enabled: enabled,
+              minLines: 1,
+              maxLines: maxLines,
+              onChanged: onChanged,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              style: Type.prose(size: 15, color: Paper.ink, height: 1.4),
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                hintText: hint,
+                hintStyle: Type.prose(size: 15, color: Paper.placeholder),
+              ),
             ),
           ),
         ),
@@ -122,6 +126,7 @@ class SendableBubble extends StatelessWidget {
               ),
           child: Text(
             text,
+            textDirection: directionOf(text),
             style: Type.prose(size: 15, color: bubbles.mineText, height: 1.4),
           ),
         ),

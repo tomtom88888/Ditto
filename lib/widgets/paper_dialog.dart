@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import 'bidi.dart';
 
 /// A dialog in the design's language rather than Material's.
 class PaperDialog extends StatelessWidget {
@@ -142,13 +143,16 @@ class _TextEntryDialogState extends State<TextEntryDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextField(
+          AutoDirection(
             controller: _controller,
-            autofocus: true,
-            minLines: widget.minLines,
-            maxLines: widget.maxLines,
-            style: Type.prose(size: 14.5, color: Paper.ink, height: 1.4),
-            decoration: paperFieldDecoration(widget.hint, monoHint: false),
+            builder: (context) => TextField(
+              controller: _controller,
+              autofocus: true,
+              minLines: widget.minLines,
+              maxLines: widget.maxLines,
+              style: Type.prose(size: 14.5, color: Paper.ink, height: 1.4),
+              decoration: paperFieldDecoration(widget.hint, monoHint: false),
+            ),
           ),
           if (widget.helper != null) ...[
             const SizedBox(height: 8),

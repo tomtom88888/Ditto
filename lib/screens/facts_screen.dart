@@ -11,6 +11,7 @@ import '../widgets/background_job_card.dart';
 import '../widgets/failure_text.dart';
 import '../widgets/format.dart';
 import '../widgets/paper_ui.dart';
+import '../widgets/bidi.dart';
 
 /// Things the other person has told you, pulled out of the chat so replies
 /// can call back to them: the dog's name, the exam on Friday.
@@ -251,36 +252,44 @@ class _Category extends StatelessWidget {
         Text(title, style: Type.display(20)),
         const SizedBox(height: 4),
         for (final fact in facts)
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 12, right: 10),
-                child: Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: Paper.accent,
-                    shape: BoxShape.circle,
+          ContentDirection(
+            text: fact.text,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 12, right: 10),
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: Paper.accent,
+                      shape: BoxShape.circle,
+                    ),
                   ),
                 ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Text(
-                    fact.text,
-                    style: Type.prose(size: 14, color: Paper.ink, height: 1.4),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Text(
+                      fact.text,
+                      textDirection: directionOf(fact.text),
+                      style: Type.prose(
+                        size: 14,
+                        color: Paper.ink,
+                        height: 1.4,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              IconButton(
-                tooltip: 'Forget this',
-                visualDensity: VisualDensity.compact,
-                onPressed: () => onForget(fact),
-                icon: Icon(Icons.close_rounded, size: 18, color: Paper.muted),
-              ),
-            ],
+                IconButton(
+                  tooltip: 'Forget this',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => onForget(fact),
+                  icon: Icon(Icons.close_rounded, size: 18, color: Paper.muted),
+                ),
+              ],
+            ),
           ),
       ],
     ),

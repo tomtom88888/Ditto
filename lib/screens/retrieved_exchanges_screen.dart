@@ -6,6 +6,7 @@ import '../theme/bubbles.dart';
 import '../theme/tokens.dart';
 import '../widgets/chat_apps.dart';
 import '../widgets/paper_ui.dart';
+import '../widgets/bidi.dart';
 
 /// The past exchanges similarity search pulled out of the style memory for one
 /// generation.
@@ -238,6 +239,7 @@ class _Bubble extends StatelessWidget {
               ),
               child: Text(
                 text,
+                textDirection: directionOf(text),
                 style: Type.prose(size: 14, color: foreground, height: 1.4),
               ),
             ),

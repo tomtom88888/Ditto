@@ -11,6 +11,7 @@ import '../widgets/compose_field.dart';
 import '../widgets/failure_text.dart';
 import '../widgets/moment_card.dart';
 import '../widgets/paper_ui.dart';
+import '../widgets/bidi.dart';
 
 /// Ask a question about your chats and get an answer, with the moments it
 /// came from.
@@ -133,6 +134,7 @@ class _AskScreenState extends ConsumerState<AskScreen> {
                 PaperCard(
                   child: Text(
                     answer.text,
+                    textDirection: directionOf(answer.text),
                     key: const ValueKey('ask-answer'),
                     style: Type.prose(
                       size: 15.5,

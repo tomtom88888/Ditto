@@ -5,6 +5,7 @@ import '../../services/group_map.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/format.dart';
 import '../../widgets/paper_ui.dart';
+import '../../widgets/bidi.dart';
 
 /// The summary at the top of the groupings: every reply as a dot on a flat
 /// map, coloured by its group, with a legend of names, counts and shares.
@@ -130,6 +131,7 @@ class _GroupMapCardState extends State<GroupMapCard> {
           const SizedBox(height: 10),
           Text(
             readout,
+            textDirection: directionOf(readout),
             key: const ValueKey('map-readout'),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,

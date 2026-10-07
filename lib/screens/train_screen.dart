@@ -27,6 +27,7 @@ import '../widgets/format.dart';
 import '../widgets/paper_dialog.dart';
 import '../widgets/paper_ui.dart';
 import 'finetune_screen.dart';
+import '../widgets/bidi.dart';
 
 /// Which of the four jobs the screen is on.
 enum _Step {
@@ -854,14 +855,17 @@ class _GroupWhoIsWho extends StatelessWidget {
         const SizedBox(height: 12),
         Text('What is the group called?', style: Type.strong(size: 13)),
         const SizedBox(height: 8),
-        TextField(
+        AutoDirection(
           controller: nameController,
-          onChanged: onName,
-          textCapitalization: TextCapitalization.sentences,
-          style: Type.prose(size: 15, color: Paper.ink),
-          decoration: paperFieldDecoration(
-            'e.g. Family, Uni friends',
-            monoHint: false,
+          builder: (context) => TextField(
+            controller: nameController,
+            onChanged: onName,
+            textCapitalization: TextCapitalization.sentences,
+            style: Type.prose(size: 15, color: Paper.ink),
+            decoration: paperFieldDecoration(
+              'e.g. Family, Uni friends',
+              monoHint: false,
+            ),
           ),
         ),
         const SizedBox(height: 18),

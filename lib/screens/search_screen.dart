@@ -12,6 +12,7 @@ import '../widgets/format.dart';
 import '../widgets/moment_card.dart';
 import '../widgets/paper_ui.dart';
 import 'settings/settings_widgets.dart';
+import '../widgets/bidi.dart';
 
 /// Search your chats by what was said: "that restaurant she mentioned"
 /// finds the moment even when the word "restaurant" never came up.
@@ -274,19 +275,22 @@ class _SearchField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Expanded(
-          child: TextField(
-            key: const ValueKey('search-field'),
+          child: AutoDirection(
             controller: controller,
-            enabled: enabled,
-            minLines: 1,
-            maxLines: 6,
-            keyboardType: TextInputType.multiline,
-            textInputAction: TextInputAction.newline,
-            style: Type.prose(size: 15, color: Paper.ink, height: 1.4),
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              hintText: 'that place she wanted to go…',
-              hintStyle: Type.prose(size: 15, color: Paper.placeholder),
+            builder: (context) => TextField(
+              key: const ValueKey('search-field'),
+              controller: controller,
+              enabled: enabled,
+              minLines: 1,
+              maxLines: 6,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              style: Type.prose(size: 15, color: Paper.ink, height: 1.4),
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                hintText: 'that place she wanted to go…',
+                hintStyle: Type.prose(size: 15, color: Paper.placeholder),
+              ),
             ),
           ),
         ),

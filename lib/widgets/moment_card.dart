@@ -6,6 +6,7 @@ import '../theme/tokens.dart';
 import 'chat_apps.dart';
 import 'format.dart';
 import 'paper_ui.dart';
+import 'bidi.dart';
 
 /// One moment from a chat: when and where, the lead-up, and your reply, in
 /// the chat's own colours.
@@ -137,6 +138,7 @@ class _MomentLine extends StatelessWidget {
           ),
       child: Text(
         text,
+        textDirection: directionOf(text),
         style: Type.prose(
           size: 13.5,
           color: bubbles.text(mine: mine),

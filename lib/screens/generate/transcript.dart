@@ -6,6 +6,7 @@ import '../../models/chat_app.dart';
 import '../../theme/bubbles.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/paper_ui.dart';
+import '../../widgets/bidi.dart';
 
 /// What the vision model read, and the correction affordances.
 class Transcript extends StatelessWidget {
@@ -145,58 +146,63 @@ class _TranscriptLine extends StatelessWidget {
                 ),
               ],
             ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // The message this one replies to, drawn like WhatsApp's quote
-            // box so it reads as context rather than as words sent here.
-            // In a group, who wrote it, as WhatsApp labels the others'
-            // bubbles.
-            if (!mine && message.author != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Text(
-                  message.author!,
-                  style: Type.strong(
-                    size: 12.5,
-                    color: _authorColour(message.author!),
-                    height: 1.3,
+        child: ContentDirection(
+          text: message.text,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // The message this one replies to, drawn like WhatsApp's quote
+              // box so it reads as context rather than as words sent here.
+              // In a group, who wrote it, as WhatsApp labels the others'
+              // bubbles.
+              if (!mine && message.author != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    message.author!,
+                    style: Type.strong(
+                      size: 12.5,
+                      color: _authorColour(message.author!),
+                      height: 1.3,
+                    ),
                   ),
                 ),
-              ),
-            if (message.quoted != null)
-              Container(
-                margin: const EdgeInsets.only(bottom: 5),
-                padding: const EdgeInsets.fromLTRB(7, 3, 7, 3),
-                decoration: BoxDecoration(
-                  color: mine
-                      ? Paper.accent.withValues(alpha: 0.12)
-                      : Paper.panel,
-                  border: Border(
-                    left: BorderSide(color: Paper.accent, width: 2.5),
+              if (message.quoted != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 5),
+                  padding: const EdgeInsets.fromLTRB(7, 3, 7, 3),
+                  decoration: BoxDecoration(
+                    color: mine
+                        ? Paper.accent.withValues(alpha: 0.12)
+                        : Paper.panel,
+                    border: Border(
+                      left: BorderSide(color: Paper.accent, width: 2.5),
+                    ),
+                  ),
+                  child: Text(
+                    message.quoted!,
+                    textDirection: directionOf(message.quoted!),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Type.prose(
+                      size: 12,
+                      color: Paper.tertiary,
+                      height: 1.35,
+                    ),
                   ),
                 ),
-                child: Text(
-                  message.quoted!,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Type.prose(
-                    size: 12,
-                    color: Paper.tertiary,
-                    height: 1.35,
-                  ),
+              Text(
+                message.text,
+                textDirection: directionOf(message.text),
+                style: Type.prose(
+                  size: 13.5,
+                  color: bubbles.text(mine: mine),
+                  height: 1.4,
                 ),
               ),
-            Text(
-              message.text,
-              style: Type.prose(
-                size: 13.5,
-                color: bubbles.text(mine: mine),
-                height: 1.4,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

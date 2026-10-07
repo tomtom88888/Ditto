@@ -19,6 +19,7 @@ import '../widgets/paper_ui.dart';
 import 'groupings/group_map_card.dart';
 import 'groupings/topic_timeline_card.dart';
 import 'settings/settings_widgets.dart';
+import '../widgets/bidi.dart';
 
 /// Your learned replies, grouped by what was being said, with a name for
 /// each group from the model.
@@ -316,13 +317,20 @@ class _GroupCardState extends State<_GroupCard> {
                 size: 24,
               ),
               const SizedBox(width: 10),
-              Expanded(child: Text(group.name, style: Type.display(22))),
+              Expanded(
+                child: Text(
+                  group.name,
+                  textDirection: directionOf(group.name),
+                  style: Type.display(22),
+                ),
+              ),
             ],
           ),
           if (group.about.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
               group.about,
+              textDirection: directionOf(group.about),
               style: Type.prose(
                 size: 13.5,
                 color: Paper.secondary,
@@ -399,6 +407,7 @@ class _Sample extends StatelessWidget {
             .copyWith(borderRadius: Corner.all(Corner.bubble)),
         child: Text(
           text,
+          textDirection: directionOf(text),
           maxLines: 3,
           overflow: TextOverflow.ellipsis,
           style: Type.prose(
