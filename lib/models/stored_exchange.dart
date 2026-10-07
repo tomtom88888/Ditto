@@ -150,6 +150,9 @@ class ChatMemory {
     this.stats = ChatStats.empty,
     this.isGroup = false,
     this.app = ChatApp.whatsapp,
+    this.from,
+    this.until,
+    this.allCount,
   });
 
   /// Row id; -1 before insertion.
@@ -187,6 +190,36 @@ class ChatMemory {
 
   /// The app the export came from.
   final ChatApp app;
+
+  /// The first day of the chat that is used, when cut down; `null` from the
+  /// start.
+  final DateTime? from;
+
+  /// The last day used, when cut down; `null` to the end.
+  final DateTime? until;
+
+  /// Every stored exchange, in the dates or not. [exchangeCount] counts only
+  /// those in them.
+  final int? allCount;
+
+  /// Whether the chat is cut down to some of its dates.
+  bool get isCut => from != null || until != null;
+
+  /// Whether [e] falls in the dates used. Starred replies, and moments with
+  /// no date, always do.
+  bool covers(StoredExchange e) {
+    if (e.source == ExchangeSource.saved) return true;
+    final at = e.timestamp;
+    if (at == null) return true;
+    if (from != null && at.isBefore(from!)) return false;
+    if (until != null && !at.isBefore(untilExclusive!)) return false;
+    return true;
+  }
+
+  /// The start of the day after [until].
+  DateTime? get untilExclusive => until == null
+      ? null
+      : DateTime(until!.year, until!.month, until!.day + 1);
 
   bool get isEmpty => exchangeCount == 0;
 
@@ -236,6 +269,29 @@ class ChatMemory {
     stats: stats ?? this.stats,
     isGroup: isGroup ?? this.isGroup,
     app: app ?? this.app,
+    from: from,
+    until: until,
+    allCount: allCount,
+  );
+
+  /// This chat cut down to [from]–[until]; both `null` for the whole chat.
+  ChatMemory withDates(DateTime? from, DateTime? until) => ChatMemory(
+    id: id,
+    myName: myName,
+    theirName: theirName,
+    embeddingModel: embeddingModel,
+    dimensions: dimensions,
+    builtAt: builtAt,
+    exchangeCount: exchangeCount,
+    savedCount: savedCount,
+    enabled: enabled,
+    profile: profile,
+    stats: stats,
+    isGroup: isGroup,
+    app: app,
+    from: from,
+    until: until,
+    allCount: allCount,
   );
 
   @override

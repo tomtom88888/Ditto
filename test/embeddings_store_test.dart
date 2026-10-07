@@ -288,6 +288,58 @@ void main() {
     },
   );
 
+  StoredExchange dated(String reply, DateTime at) => StoredExchange(
+    id: -1,
+    context: const [ChatTurn(sender: 'Sam', text: 'x', messageCount: 1)],
+    contextText: 'Sam: x',
+    replyText: reply,
+    vector: VectorMath.normalise([1, 0]),
+    hash: StoredExchange.contentHash('Sam: x', reply),
+    timestamp: at,
+  );
+
+  test(
+    'a chat cut down to some dates only uses those, and keeps the rest',
+    () async {
+      final store = open();
+      final sam = await store.saveChat(
+        chat('Sam'),
+        added: [
+          dated('jan', DateTime(2026, 1, 10, 20)),
+          dated('feb', DateTime(2026, 2, 10, 20)),
+          dated('mar', DateTime(2026, 3, 31, 23, 59)),
+          dated('apr', DateTime(2026, 4, 1, 9)),
+        ],
+      );
+      expect(await store.dateSpan(sam.id), (
+        DateTime(2026, 1, 10, 20),
+        DateTime(2026, 4, 1, 9),
+      ));
+
+      await store.setChatDates(
+        sam.id,
+        from: DateTime(2026, 2, 1),
+        until: DateTime(2026, 3, 31),
+      );
+      expect((await store.all()).map((e) => e.replyText), ['feb', 'mar']);
+      final cut = (await store.chats()).single;
+      expect(cut.isCut, isTrue);
+      expect(cut.from, DateTime(2026, 2, 1));
+      expect(cut.until, DateTime(2026, 3, 31));
+      expect(cut.exchangeCount, 2);
+      expect(cut.allCount, 4);
+      await store.close();
+
+      // Kept after reopening; and the whole chat comes back on asking.
+      final reopened = open();
+      expect((await reopened.all()).map((e) => e.replyText), ['feb', 'mar']);
+      await reopened.setChatDates(sam.id);
+      expect(await reopened.all(), hasLength(4));
+      expect((await reopened.chats()).single.isCut, isFalse);
+      await reopened.close();
+    },
+  );
+
   test('remembers which app a chat came from', () async {
     final store = open();
     await store.saveChat(

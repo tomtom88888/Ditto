@@ -46,6 +46,10 @@ AI provider you choose (OpenAI, Claude or Gemini), made with your own key.
 - **Chat groupings.** Groups your replies by what was being talked about,
   names each group, draws them on a map, and shows how topics change over
   time.
+- **Choose dates.** From a chat's menu on the home screen, cut it down to
+  the dates you want: replies, search, Ask, Analysis, groupings and graphs
+  then use only that stretch. Everything stays stored, so "Use the whole
+  chat" puts it back.
 - **Chat data.** Reply times, who texts first, double texts, busiest days,
   favourite words and emoji. Counted on the phone, no API calls.
 

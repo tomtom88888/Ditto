@@ -285,6 +285,18 @@ void main() {
     expect(find.text('Replying to \u2068Mum\u2069'), findsOneWidget);
   });
 
+  testWidgets('a chat cut down to some dates says so on home', (tester) async {
+    final store = trainedStore();
+    await store.setChatDates(
+      1,
+      from: DateTime(2026, 2, 1),
+      until: DateTime(2026, 3, 31),
+    );
+    await pumpApp(tester, apiKey: 'sk-test-0123456789abcdefghij', store: store);
+    expect(find.byKey(const ValueKey('dates-1')), findsOneWidget);
+    expect(find.text('1 Feb 2026 – 31 Mar 2026'), findsOneWidget);
+  });
+
   testWidgets('chat data asks for a re-import when a chat has no numbers', (
     tester,
   ) async {

@@ -35,10 +35,24 @@ class MemoryExchangeStore implements ExchangeStore {
   int saveCalls = 0;
 
   ChatMemory _withCounts(ChatMemory chat) {
-    final mine = rows.where((r) => r.chatId == chat.id);
-    return chat.copyWith(
-      exchangeCount: mine.length,
+    final mine = rows.where((r) => r.chatId == chat.id).toList();
+    return ChatMemory(
+      id: chat.id,
+      myName: chat.myName,
+      theirName: chat.theirName,
+      embeddingModel: chat.embeddingModel,
+      dimensions: chat.dimensions,
+      builtAt: chat.builtAt,
+      exchangeCount: mine.where(chat.covers).length,
       savedCount: mine.where((r) => r.source == ExchangeSource.saved).length,
+      enabled: chat.enabled,
+      profile: chat.profile,
+      stats: chat.stats,
+      isGroup: chat.isGroup,
+      app: chat.app,
+      from: chat.from,
+      until: chat.until,
+      allCount: mine.length,
     );
   }
 
@@ -96,8 +110,34 @@ class MemoryExchangeStore implements ExchangeStore {
   @override
   Future<List<StoredExchange>> all({Set<int>? chatIds}) async => [
     for (final row in rows)
-      if (chatIds == null || chatIds.contains(row.chatId)) row,
+      if ((chatIds == null || chatIds.contains(row.chatId)) &&
+          (_chats[row.chatId]?.covers(row) ?? true))
+        row,
   ];
+
+  @override
+  Future<void> setChatDates(
+    int chatId, {
+    DateTime? from,
+    DateTime? until,
+  }) async {
+    final chat = _chats[chatId];
+    if (chat != null) _chats[chatId] = chat.withDates(from, until);
+  }
+
+  @override
+  Future<(DateTime?, DateTime?)> dateSpan(int chatId) async {
+    DateTime? first;
+    DateTime? last;
+    for (final r in rows) {
+      final at = r.timestamp;
+      if (r.chatId != chatId || at == null) continue;
+      if (r.source == ExchangeSource.saved) continue;
+      if (first == null || at.isBefore(first)) first = at;
+      if (last == null || at.isAfter(last)) last = at;
+    }
+    return (first, last);
+  }
 
   @override
   Future<void> recordFeedback(SuggestionFeedback feedback) async =>

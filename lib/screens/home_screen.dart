@@ -84,6 +84,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (mounted) _refresh();
   }
 
+  /// Cuts [chat] down to the dates picked, or [whole] puts all of it back.
+  Future<void> _chooseDates(ChatMemory chat, {bool whole = false}) async {
+    final notifier = ref.read(chatsProvider.notifier);
+    if (whole) {
+      await notifier.setDates(chat.id);
+      if (mounted) showToast(context, 'Using the whole chat again.');
+      return;
+    }
+    final (first, last) = await ref
+        .read(exchangeStoreProvider)
+        .dateSpan(chat.id);
+    if (!mounted) return;
+    if (first == null || last == null) {
+      showToast(context, 'This chat has no dates to cut by.');
+      return;
+    }
+    DateTime day(DateTime d) => DateTime(d.year, d.month, d.day);
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: day(first),
+      lastDate: day(last),
+      initialDateRange: DateTimeRange(
+        start: day(chat.from ?? first),
+        end: day(chat.until ?? last),
+      ),
+      helpText: 'Use only these dates',
+      saveText: 'Use',
+    );
+    if (range == null || !mounted) return;
+    final all = range.start == day(first) && range.end == day(last);
+    await notifier.setDates(
+      chat.id,
+      from: all ? null : range.start,
+      until: all ? null : range.end,
+    );
+    if (mounted) {
+      showToast(
+        context,
+        all
+            ? 'Using the whole chat.'
+            : 'Using ${dayMonthYear(range.start)} to '
+                  '${dayMonthYear(range.end)}.',
+        detail:
+            'Replies, search and graphs use these dates now. Run the '
+            'analysis and groupings again to update them.',
+      );
+    }
+  }
+
   Future<void> _confirmDelete(ChatMemory chat) async {
     final name = chat.theirName.isEmpty ? 'this chat' : chat.theirName;
     final confirmed = await showDialog<bool>(
@@ -175,6 +224,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     chats: learned,
                     onOpen: (chat) => _push(GenerateScreen(chat: chat)),
                     onDelete: _confirmDelete,
+                    onDates: (chat, {whole = false}) =>
+                        _chooseDates(chat, whole: whole),
                     onAdd: openTrain,
                   ),
                   if (enabled.where((c) => c.isOutOfDate()).toList()
@@ -321,12 +372,14 @@ class _ChatList extends StatelessWidget {
     required this.chats,
     required this.onOpen,
     required this.onDelete,
+    required this.onDates,
     required this.onAdd,
   });
 
   final List<ChatMemory> chats;
   final ValueChanged<ChatMemory> onOpen;
   final ValueChanged<ChatMemory> onDelete;
+  final void Function(ChatMemory chat, {bool whole}) onDates;
   final VoidCallback onAdd;
 
   @override
@@ -345,6 +398,7 @@ class _ChatList extends StatelessWidget {
                 chat: chat,
                 onTap: () => onOpen(chat),
                 onDelete: () => onDelete(chat),
+                onDates: ({whole = false}) => onDates(chat, whole: whole),
               ),
             _AddChatRow(onTap: onAdd),
           ],
@@ -389,11 +443,13 @@ class _ChatRow extends StatelessWidget {
     required this.chat,
     required this.onTap,
     required this.onDelete,
+    required this.onDates,
   });
 
   final ChatMemory chat;
   final VoidCallback onTap;
   final VoidCallback onDelete;
+  final void Function({bool whole}) onDates;
 
   @override
   Widget build(BuildContext context) {
@@ -433,7 +489,35 @@ class _ChatRow extends StatelessWidget {
                       weight: FontWeight.w400,
                     ),
                   ),
-                  if (chat.isOutOfDate())
+                  if (chat.isCut)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.content_cut_rounded,
+                            size: 13,
+                            color: Paper.accent,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              '${chat.from == null ? "Start" : dayMonthYear(chat.from!)} – '
+                              '${chat.until == null ? "now" : dayMonthYear(chat.until!)}',
+                              key: ValueKey('dates-${chat.id}'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Type.prose(
+                                size: 11.5,
+                                color: Paper.accent,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (chat.isOutOfDate() && chat.until == null)
                     Padding(
                       padding: const EdgeInsets.only(top: 3),
                       child: Row(
@@ -469,6 +553,18 @@ class _ChatRow extends StatelessWidget {
               icon: Icon(Icons.more_horiz, size: 20, color: Paper.tertiary),
               itemBuilder: (context) => [
                 PopupMenuItem(
+                  value: 'dates',
+                  child: Text('Choose dates…', style: Type.strong(size: 14)),
+                ),
+                if (chat.isCut)
+                  PopupMenuItem(
+                    value: 'whole',
+                    child: Text(
+                      'Use the whole chat',
+                      style: Type.strong(size: 14),
+                    ),
+                  ),
+                PopupMenuItem(
                   value: 'delete',
                   child: Text(
                     'Forget this chat',
@@ -476,7 +572,11 @@ class _ChatRow extends StatelessWidget {
                   ),
                 ),
               ],
-              onSelected: (_) => onDelete(),
+              onSelected: (choice) => switch (choice) {
+                'dates' => onDates(),
+                'whole' => onDates(whole: true),
+                _ => onDelete(),
+              },
             ),
           ],
         ),

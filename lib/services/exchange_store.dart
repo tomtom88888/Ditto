@@ -41,6 +41,13 @@ abstract interface class ExchangeStore {
   /// Exchanges in the given chats (or all of them), oldest first.
   Future<List<StoredExchange>> all({Set<int>? chatIds});
 
+  /// Cuts [chatId] down to [from]–[until] (whole days); both `null` uses the
+  /// whole chat again. Exchanges outside are kept, just not used.
+  Future<void> setChatDates(int chatId, {DateTime? from, DateTime? until});
+
+  /// The first and last dates in [chatId]'s export, whatever dates are used.
+  Future<(DateTime?, DateTime?)> dateSpan(int chatId);
+
   /// Stores search fingerprints for exchanges already saved, by row id.
   Future<void> saveFocus(Map<int, Float32List> focus);
 

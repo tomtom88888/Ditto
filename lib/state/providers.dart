@@ -229,6 +229,14 @@ class ChatsNotifier extends AsyncNotifier<List<ChatMemory>> {
         .setChatEnabled(chatId, enabled: enabled);
   }
 
+  /// Uses only [from]–[until] of the chat; both `null` for all of it.
+  Future<void> setDates(int chatId, {DateTime? from, DateTime? until}) async {
+    await ref
+        .read(exchangeStoreProvider)
+        .setChatDates(chatId, from: from, until: until);
+    await reload();
+  }
+
   Future<void> delete(int chatId) async {
     await ref.read(exchangeStoreProvider).deleteChat(chatId);
     // What was learned about them goes with the chat.
