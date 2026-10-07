@@ -3,7 +3,7 @@ description: >-
   Suggests WhatsApp replies written in your own texting style, learned from
   your own chat exports. All chat data stays on the device.
 publish_to: "none"
-version: 0.11.0+18
+version: 0.12.0+19
 
 environment:
   sdk: ^3.12.0

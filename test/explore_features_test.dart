@@ -272,6 +272,89 @@ void main() {
       expect(hits.last.wordMatch, isFalse);
     });
 
+    test('the model keeps only real matches, best first, with why', () async {
+      final sent = <Map<String, Object?>>[];
+      final store = MemoryExchangeStore(
+        chats: [chat()],
+        rows: [
+          exchange(id: 1, vector: [1, 0], reply: 'see you there'),
+          exchange(
+            id: 2,
+            vector: [0.9, 0.1],
+            context: [turn('Maya', 'the ramen place on 5th was unreal')],
+            reply: 'we have to go back',
+          ),
+          exchange(id: 3, vector: [0.8, 0.2], reply: 'lol'),
+        ],
+      );
+      final search = ChatSearch(
+        openai: fake(
+          sent: sent,
+          embed: (_) => [1, 0],
+          answer: (_) =>
+              '{"matches": [{"id": 2, "score": 4, "why": "x"}, '
+              '{"id": 0, "score": 9, "why": "she raves about ramen"}]}',
+        ),
+        store: store,
+      );
+      final hits = await search.search(
+        'that ramen place',
+        chatIds: {1},
+        embeddingModel: 'text-embedding-3-small',
+        dimensions: 2,
+        model: 'gpt-5.6-terra',
+      );
+      // Shortlisted as 2 (its words match), 1, 3. The model kept the first,
+      // the ramen moment, and dropped the one it scored 4; 1 it left out.
+      expect(hits.map((h) => h.exchange.id), [2]);
+      expect(hits.single.why, 'she raves about ramen');
+      expect(hits.single.score, 0.9);
+      expect(sent, hasLength(2), reason: 'one embedding, one reading');
+      final prompt =
+          ((sent.last['messages']! as List).last as Map)['content'] as String;
+      expect(prompt, contains('Looking for: that ramen place'));
+      expect(prompt, contains('Me: we have to go back'));
+    });
+
+    test('if the reading fails, the plain ranking is shown', () async {
+      final store = MemoryExchangeStore(
+        chats: [chat()],
+        rows: [
+          exchange(id: 1, vector: [1, 0]),
+          exchange(id: 2, vector: [-1, 0]),
+        ],
+      );
+      final search = ChatSearch(
+        openai: OpenAiService(
+          apiKey: 'sk-test-0123456789abcdefghij',
+          maxRetries: 0,
+          client: MockClient((request) async {
+            if (request.url.path.endsWith('/embeddings')) {
+              return json({
+                'data': [
+                  {
+                    'index': 0,
+                    'embedding': [1, 0],
+                  },
+                ],
+              });
+            }
+            return http.Response('{"error": {"message": "nope"}}', 400);
+          }),
+        ),
+        store: store,
+      );
+      final hits = await search.search(
+        'x',
+        chatIds: {1},
+        embeddingModel: 'text-embedding-3-small',
+        dimensions: 2,
+        model: 'gpt-5.6-terra',
+      );
+      expect(hits.map((h) => h.exchange.id), [1]);
+      expect(hits.single.why, isNull);
+    });
+
     test('one embedding call per search', () async {
       final sent = <Map<String, Object?>>[];
       final store = MemoryExchangeStore(
@@ -397,7 +480,11 @@ void main() {
       tester,
       const SearchScreen(),
       store: store,
-      openai: fake(embed: (_) => [1, 0]),
+      openai: fake(
+        embed: (_) => [1, 0],
+        answer: (_) =>
+            '{"matches": [{"id": 0, "score": 9, "why": "raves about ramen"}]}',
+      ),
     );
     // The box grows with what is typed, a line at a time.
     final field = tester.widget<TextField>(
@@ -414,7 +501,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('search-go')));
     await tester.pumpAndSettle();
 
-    expect(find.text('1 moment, closest first'), findsOneWidget);
+    expect(find.text('1 moment, best match first'), findsOneWidget);
+    expect(find.text('raves about ramen'), findsOneWidget);
     expect(find.text('that ramen place was unreal'), findsOneWidget);
     expect(find.text('we have to go back'), findsOneWidget);
     expect(find.textContaining('14 Feb 2026'), findsOneWidget);

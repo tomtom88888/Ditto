@@ -70,6 +70,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         embeddingModel: settings.embeddingModel,
         dimensions: settings.embeddingDimensions,
         limit: settings.searchResultCount,
+        // The closest moments are read by the chat model, which keeps
+        // only the ones that really match.
+        model: settings.generationModel,
       );
       if (mounted) {
         setState(() {
@@ -159,13 +162,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
               if (hits != null && hits.isEmpty)
                 Notice(
-                  'Nothing close to "$_searched". Try describing it '
-                  'differently, or search every chat.',
+                  'Nothing matched "$_searched". Try other words, or search '
+                  'every chat.',
                 ),
               if (hits != null && hits.isNotEmpty) ...[
                 MonoLabel(
                   '${hits.length} ${hits.length == 1 ? "moment" : "moments"}, '
-                  'closest first',
+                  'best match first',
                 ),
                 for (final hit in hits)
                   _HitCard(
@@ -182,7 +185,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ];
           },
         ),
-        const Footnote('Your chats are searched on this phone.'),
+        const Footnote(
+          'The closest moments are read by your writing model, which keeps '
+          'only the real matches.',
+        ),
       ],
     );
   }
@@ -365,6 +371,13 @@ class _HitCardState extends State<_HitCard> {
               ),
             ],
           ),
+          if (widget.hit.why != null) ...[
+            const SizedBox(height: 3),
+            Text(
+              widget.hit.why!,
+              style: Type.prose(size: 12.5, color: Paper.accent, height: 1.3),
+            ),
+          ],
           const SizedBox(height: 6),
           if (hidden > 0)
             GestureDetector(
