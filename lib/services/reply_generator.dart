@@ -31,19 +31,20 @@ enum Refinement {
       'Make it warmer and friendlier, the way $me is when they are in a good '
           'mood with this person. Do not make it longer than it needs to be.',
     moreLikeMe =>
-      'It does not sound enough like $me. Rewrite it to match the examples '
-          'and the measured habits more closely — their length, casing, '
-          'punctuation, slang and emoji — even if that makes it rougher.',
+      'It does not sound enough like $me. Rewrite it to act and sound more '
+          'like the reference moments and the measured habits — how $me '
+          'reacts, and their length, casing, punctuation, slang and emoji — '
+          'even if that makes it rougher.',
   };
 }
 
 /// Writes the next message as you.
 ///
-/// The model is not asked to imitate you; it is put in your place. Your
-/// retrieved real exchanges go in as genuine turns of the conversation —
-/// their lines as the user's, your actual reply as the model's own previous
-/// message — so writing the next message *is* continuing in your voice. The
-/// closest match sits last, right before the live chat.
+/// The model is put in your place and answers the live chat as you. Your
+/// retrieved real exchanges go in the system prompt as reference moments:
+/// how you act and sound in situations like this one, never content to
+/// bring up, since they come from other conversations. The closest match
+/// sits last.
 ///
 /// The model then writes several plain drafts, which are held to the habits
 /// measured from your replies ([StyleConformer]) and ranked by how typical of
@@ -107,6 +108,7 @@ class ReplyGenerator {
     bool group = false,
     List<String> facts = const [],
     List<String> styleGuide = const [],
+    List<String> acting = const [],
   }) async {
     if (conversation.isEmpty) {
       throw const OpenAiException(
@@ -138,6 +140,7 @@ class ReplyGenerator {
           group: group,
           facts: facts,
           styleGuide: styleGuide,
+          acting: acting,
         );
 
     final answers = await _bestDrafts(
@@ -203,6 +206,7 @@ class ReplyGenerator {
     List<String> voiceSample = const [],
     List<String> facts = const [],
     List<String> styleGuide = const [],
+    List<String> acting = const [],
     String note = '',
     String quietFor = '',
     bool group = false,
@@ -215,19 +219,20 @@ class ReplyGenerator {
       profile: profile,
       voiceSample: voiceSample,
       note: note,
-      hasExamples: false,
       group: group,
       earlier: recent,
       earlierIntro: 'How the chat with $them went the last time you talked:',
       facts: facts,
       styleGuide: styleGuide,
+      acting: acting,
       extra:
           'There is no new message to answer: the chat has gone quiet'
           '${quietFor.isEmpty ? "" : " for $quietFor"}. Write one message $me '
           'could send to start it up again with $them. Make it easy to '
           'answer and specific to the two of them: follow up on something '
           'from the end of the chat or from what $me knows about $them, or '
-          'open something new they would enjoy. No "hey stranger", no '
+          'open something new they would enjoy. Open the way $me really '
+          'does, with $me\'s usual energy. No "hey stranger", no '
           'apologising for the silence unless $me would.',
     );
     final drafts = await _bestDrafts(
@@ -252,23 +257,24 @@ class ReplyGenerator {
     List<ChatTurn> recent = const [],
     bool group = false,
     List<String> styleGuide = const [],
+    List<String> acting = const [],
   }) async {
     final me = _name(settings.myName, 'the user');
     final system = buildSystemPrompt(
       settings,
       profile: profile,
       voiceSample: voiceSample,
-      hasExamples: false,
       group: group,
       earlier: recent,
       styleGuide: styleGuide,
+      acting: acting,
       earlierIntro: 'The end of the chat so far, for background:',
       extra:
           '$me has written the message in the last user message and wants '
           'it to sound like them. Rewrite it so it says the same thing, '
-          'with nothing added or left out, in exactly the way $me writes: '
-          'length, casing, punctuation, slang, emoji and bubbles. Send only '
-          'the rewritten message.',
+          'with nothing added or left out, in exactly the way $me writes '
+          'and comes across: tone, energy, length, casing, punctuation, '
+          'slang, emoji and bubbles. Send only the rewritten message.',
     );
     return _bestDrafts(
       [
@@ -290,14 +296,17 @@ class ReplyGenerator {
     StyleProfile profile = StyleProfile.empty,
     List<String> voiceSample = const [],
     List<String> styleGuide = const [],
+    List<String> acting = const [],
   }) async {
     final me = _name(settings.myName, 'the user');
     final them = _name(settings.theirName, 'them');
     final habits = profile.describe(me);
     final system = StringBuffer(
-      'You judge whether a message sounds like $me texting $them. Compare it '
-      'with how $me really writes to $them, below, and nothing else: not '
-      'whether it is a good message, only whether it is $me.',
+      'You judge whether a message sounds like $me texting $them: both how '
+      'it is written and how it comes across (its tone, energy and the way '
+      'it reacts). Compare it with how $me really writes to and acts with '
+      '$them, below, and nothing else: not whether it is a good message, '
+      'only whether it is $me.',
     );
     if (styleGuide.isNotEmpty) {
       system
@@ -305,6 +314,13 @@ class ReplyGenerator {
         ..writeln()
         ..writeln('How $me writes to $them:')
         ..write(styleGuide.map((l) => '- $l').join('\n'));
+    }
+    if (acting.isNotEmpty) {
+      system
+        ..writeln()
+        ..writeln()
+        ..writeln('How $me acts with $them:')
+        ..write(acting.map((l) => '- $l').join('\n'));
     }
     if (habits.isNotEmpty) {
       system
@@ -316,7 +332,7 @@ class ReplyGenerator {
       system
         ..writeln()
         ..writeln()
-        ..writeln('Messages $me really sent $them:')
+        ..writeln('Messages $me really sent $them (about other things):')
         ..write(
           voiceSample.map((m) => '- ${m.replaceAll('\n', ' / ')}').join('\n'),
         );
@@ -356,6 +372,7 @@ class ReplyGenerator {
     bool group = false,
     List<String> facts = const [],
     List<String> styleGuide = const [],
+    List<String> acting = const [],
   }) async {
     final me = _name(settings.myName, 'the user');
     final messages = buildMessages(
@@ -369,6 +386,7 @@ class ReplyGenerator {
       group: group,
       facts: facts,
       styleGuide: styleGuide,
+      acting: acting,
       extra:
           'You had drafted this as your next message:\n'
           '${suggestion.text}\n\n'
@@ -396,9 +414,8 @@ class ReplyGenerator {
 
   // ------------------------------------------------------------------ prompts
 
-  /// The whole request: the system prompt, each retrieved exchange as a real
-  /// back-and-forth (least similar first, so the closest sits nearest the live
-  /// chat), then the live chat as the last user turn.
+  /// The whole request: the system prompt, with the retrieved exchanges in
+  /// it as reference moments, then the live chat as the one user turn.
   static List<ChatMessageJson> buildMessages({
     required List<ChatTurn> conversation,
     required List<ScoredExchange> examples,
@@ -410,9 +427,9 @@ class ReplyGenerator {
     bool group = false,
     List<String> facts = const [],
     List<String> styleGuide = const [],
+    List<String> acting = const [],
     String? extra,
   }) {
-    final me = settings.myName;
     final earlier = conversation.length > settings.contextTurns
         ? conversation.sublist(0, conversation.length - settings.contextTurns)
         : const <ChatTurn>[];
@@ -425,25 +442,15 @@ class ReplyGenerator {
           voiceSample: voiceSample,
           note: note,
           newTopic: newTopic,
-          hasExamples: examples.isNotEmpty,
+          examples: examples,
           group: group,
           earlier: earlier,
           facts: facts,
           styleGuide: styleGuide,
+          acting: acting,
           extra: extra,
         ),
       },
-      for (final example in examples.reversed) ...[
-        {
-          'role': 'user',
-          'content': _theirSide(
-            example.exchange.context,
-            me: me,
-            named: group || _othersIn(example.exchange.context, me) > 1,
-          ),
-        },
-        {'role': 'assistant', 'content': example.exchange.replyText},
-      ],
       {
         'role': 'user',
         'content': buildUserPrompt(
@@ -472,6 +479,23 @@ class ReplyGenerator {
             : (named ? '${t.sender}: ${t.text}' : t.text),
       )
       .join('\n');
+
+  /// A retrieved exchange as a reference moment: who said what, ending
+  /// with your reply.
+  static String _moment(
+    StoredExchange exchange, {
+    required String me,
+    required bool group,
+  }) {
+    final named = group || _othersIn(exchange.context, me) > 1;
+    String line(String sender, String text) => sender == me
+        ? 'Me: ${text.replaceAll('\n', ' / ')}'
+        : '${named ? sender : 'Them'}: ${text.replaceAll('\n', ' / ')}';
+    return [
+      for (final t in exchange.context) line(t.sender, t.text),
+      line(me, exchange.replyText),
+    ].join('\n');
+  }
 
   /// Most of the conversation before the live window that goes in the
   /// prompt as background.
@@ -518,11 +542,12 @@ class ReplyGenerator {
     List<String> voiceSample = const [],
     String note = '',
     bool newTopic = false,
-    bool hasExamples = true,
+    List<ScoredExchange> examples = const [],
     bool group = false,
     List<ChatTurn> earlier = const [],
     List<String> facts = const [],
     List<String> styleGuide = const [],
+    List<String> acting = const [],
     String? extra,
     String? earlierIntro,
   }) {
@@ -547,19 +572,16 @@ class ReplyGenerator {
     }
 
     section(
-      '${group ? "How this chat is laid out: each user message is what the "
-                "others in $them said, each line starting with who said it "
-                "(lines marked \"(you)\" are yours, from earlier), and each "
-                "assistant message is exactly what $me sent back. Several "
-                "people are talking: answer as $me would in the group — to "
-                "whoever it makes sense to answer, usually the last message, "
-                "without addressing everyone." : "How this chat is laid out: "
-                "each user message is what $them said (lines marked "
-                "\"(you)\" are yours, from earlier), and each assistant "
-                "message is exactly what $me sent back."}'
-      '${hasExamples ? " The earlier pairs are real moments from $me's chat "
-                "history, chosen because they resemble this one — the last "
-                "pair is the closest." : ""}',
+      group
+          ? 'The user message is the latest part of $them: what the others '
+                'said, each line starting with who said it (lines marked '
+                '"(you)" are $me\'s own, from earlier). Several people are '
+                'talking: answer as $me would in the group — to whoever it '
+                'makes sense to answer, usually the last message, without '
+                'addressing everyone.'
+          : 'The user message is the latest part of the chat: what $them '
+                'said (lines marked "(you)" are $me\'s own, from earlier). '
+                'Reply to that conversation only.',
     );
 
     if (earlier.isNotEmpty) {
@@ -591,6 +613,28 @@ class ReplyGenerator {
       );
     }
 
+    if (acting.isNotEmpty) {
+      section(
+        'How $me acts with $them, as studied from their whole chat (this '
+        'decides how the message reacts, not just how it is worded):\n'
+        '${acting.map((l) => '- $l').join('\n')}',
+      );
+    }
+
+    if (examples.isNotEmpty) {
+      section(
+        'Reference moments: real exchanges from other, unrelated times in '
+        '$me\'s chats, picked because the situation is like this one. They '
+        'are not part of this conversation. Never mention, continue, answer '
+        'or assume anything from them: no people, places, plans, events or '
+        'jokes from them unless $them brings it up now. Use them only to see '
+        'how $me acts — what $me picks up on, how keen or unbothered $me is, '
+        'how $me teases, flirts, agrees, pushes back, asks back or commits — '
+        'and how $me words it. The last one is the closest match.\n\n'
+        '${examples.reversed.map((e) => _moment(e.exchange, me: settings.myName, group: group)).join('\n\n')}',
+      );
+    }
+
     final habits = profile.describe(me);
     if (habits.isNotEmpty) {
       section(
@@ -602,8 +646,9 @@ class ReplyGenerator {
 
     if (voiceSample.isNotEmpty) {
       section(
-        'Other messages $me has really sent, to hear the voice (not to '
-        'copy):\n${voiceSample.map((m) => '- ${m.replaceAll('\n', ' / ')}').join('\n')}',
+        'Other messages $me has sent at other times, only to hear how $me '
+        'sounds. They are about other things: never refer to what they '
+        'say, and do not copy them:\n${voiceSample.map((m) => '- ${m.replaceAll('\n', ' / ')}').join('\n')}',
       );
     }
 

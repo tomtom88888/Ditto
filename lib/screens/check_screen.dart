@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/app_settings.dart';
 import '../models/stored_exchange.dart';
+import '../services/chat_analysis.dart';
 import '../services/message_check.dart';
 import '../services/reply_generator.dart';
 import '../state/providers.dart';
@@ -32,14 +33,12 @@ class _CheckScreenState extends ConsumerState<CheckScreen> {
   StyleVerdict? _verdict;
   bool _judging = false;
 
-  /// Each chat's "how you write", once looked up.
-  final Map<int, Future<List<String>>> _guides = {};
+  /// Each chat's analysis, once looked up.
+  final Map<int, Future<ChatAnalysis?>> _analyses = {};
 
-  Future<List<String>> _guideFor(ChatMemory chat) => _guides.putIfAbsent(
+  Future<ChatAnalysis?> _analysisOf(ChatMemory chat) => _analyses.putIfAbsent(
     chat.id,
-    () async =>
-        (await ref.read(analysisStoreProvider).forChat(chat.id))?.writing ??
-        const <String>[],
+    () => ref.read(analysisStoreProvider).forChat(chat.id),
   );
 
   AppSettings _named(AppSettings settings, ChatMemory chat) =>
@@ -70,7 +69,8 @@ class _CheckScreenState extends ConsumerState<CheckScreen> {
           chatIds: {chat.id},
           preferChatId: chat.id,
         ),
-        styleGuide: await _guideFor(chat),
+        styleGuide: (await _analysisOf(chat))?.writing ?? const [],
+        acting: (await _analysisOf(chat))?.actingGuide ?? const [],
       );
       if (mounted) setState(() => _verdict = verdict);
     } on Object catch (error) {
@@ -110,7 +110,8 @@ class _CheckScreenState extends ConsumerState<CheckScreen> {
           preferChatId: chat.id,
         ),
         group: chat.isGroup,
-        styleGuide: await _guideFor(chat),
+        styleGuide: (await _analysisOf(chat))?.writing ?? const [],
+        acting: (await _analysisOf(chat))?.actingGuide ?? const [],
       );
       if (mounted) setState(() => _rewrites = rewrites);
     } on Object catch (error) {
@@ -186,14 +187,14 @@ class _CheckScreenState extends ConsumerState<CheckScreen> {
                 SendableBubble(text: check.quickFix!, app: chat.app),
               ],
               if (_draft.text.trim().isNotEmpty)
-                FutureBuilder<List<String>>(
-                  future: _guideFor(chat),
+                FutureBuilder<ChatAnalysis?>(
+                  future: _analysisOf(chat),
                   builder: (context, guide) => PaperAction(
                     key: const ValueKey('judge'),
                     title: 'Is it like me?',
                     subtitle: !hasKey
                         ? 'Add an API key in Settings first'
-                        : (guide.data ?? const []).isEmpty
+                        : guide.data?.isEmpty ?? true
                         ? 'Uses your numbers and messages · analyse the chat '
                               'for a sharper answer'
                         : 'Against how you write to ${bidiIsolate(them)}, '

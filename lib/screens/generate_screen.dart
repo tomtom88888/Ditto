@@ -85,6 +85,7 @@ class _GenerateScreenState extends ConsumerState<GenerateScreen> {
 
   /// How you write to the person replied to, from their chat's analysis.
   List<String> _styleGuide = const [];
+  List<String> _acting = const [];
 
   /// A one-off instruction for this reply: what to say, as opposed to how.
   /// Cleared with the screenshot, because it belongs to this moment.
@@ -435,10 +436,11 @@ class _GenerateScreenState extends ConsumerState<GenerateScreen> {
                       const <ChatFact>[])
                 f.text,
             ];
-      final styleGuide = chat == null
-          ? const <String>[]
-          : (await ref.read(analysisStoreProvider).forChat(chat.id))?.writing ??
-                const <String>[];
+      final analysis = chat == null
+          ? null
+          : await ref.read(analysisStoreProvider).forChat(chat.id);
+      final styleGuide = analysis?.writing ?? const <String>[];
+      final acting = analysis?.actingGuide ?? const <String>[];
       final variants = await generator.generate(
         conversation: conversation,
         examples: retrieved.examples,
@@ -449,11 +451,13 @@ class _GenerateScreenState extends ConsumerState<GenerateScreen> {
         group: _isGroup(chat),
         facts: facts,
         styleGuide: styleGuide,
+        acting: acting,
       );
       if (mounted) {
         setState(() {
           _facts = facts;
           _styleGuide = styleGuide;
+          _acting = acting;
           _conversation = conversation;
           _examples = retrieved.examples;
           _skipped = retrieved.skipped;
@@ -492,6 +496,7 @@ class _GenerateScreenState extends ConsumerState<GenerateScreen> {
         group: _isGroup(_currentReplyingTo(_enabledChats())),
         facts: _facts,
         styleGuide: _styleGuide,
+        acting: _acting,
       );
       if (!mounted) return;
       setState(() {

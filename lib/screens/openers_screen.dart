@@ -68,9 +68,7 @@ class _OpenersScreenState extends ConsumerState<OpenersScreen> {
                 const <ChatFact>[])
           f.text,
       ];
-      final styleGuide =
-          (await ref.read(analysisStoreProvider).forChat(chat.id))?.writing ??
-          const <String>[];
+      final analysis = await ref.read(analysisStoreProvider).forChat(chat.id);
       final openers = await generator.openers(
         settings: settings.copyWith(
           myName: chat.myName.isEmpty ? 'Me' : chat.myName,
@@ -80,7 +78,8 @@ class _OpenersScreenState extends ConsumerState<OpenersScreen> {
         profile: chat.profile,
         voiceSample: voice,
         facts: facts,
-        styleGuide: styleGuide,
+        styleGuide: analysis?.writing ?? const [],
+        acting: analysis?.actingGuide ?? const [],
         note: _note.text,
         quietFor: quietFor(chat.lastMessageAt),
         group: chat.isGroup,

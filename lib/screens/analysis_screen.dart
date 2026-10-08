@@ -236,7 +236,15 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                     lines: analysis.writing,
                     highlight: true,
                   ),
-                if (analysis.you.isNotEmpty)
+                if (analysis.acting.isNotEmpty)
+                  _Section(
+                    key: const ValueKey('how-you-act'),
+                    title: 'How you act',
+                    caption: 'Replies act like this too',
+                    lines: analysis.acting,
+                    highlight: true,
+                  )
+                else if (analysis.you.isNotEmpty)
                   _Section(title: 'How you act', lines: analysis.you),
                 if (analysis.them.isNotEmpty)
                   _Section(

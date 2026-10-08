@@ -83,6 +83,23 @@ void main() {
       final lines = ChatAnalysis.fromJson({'writing': '- one\n• two\n\n'})!;
       expect(lines.writing, ['one', 'two']);
     });
+
+    test('asks how you act as well as how you write', () {
+      final prompt = ChatAnalyst.systemPrompt(me: 'Robin', them: 'Maya');
+      expect(prompt, contains('"acting"'));
+      expect(prompt, contains('how keen or unbothered'));
+      final a = ChatAnalysis.fromJson({
+        'acting': ['Rarely asks back'],
+        'you': ['Starts most conversations'],
+      })!;
+      expect(a.actingGuide, ['Rarely asks back']);
+      // An older analysis, with no "acting", falls back to its observations.
+      final old = ChatAnalysis.fromJson({
+        'you': ['Starts most conversations'],
+      })!;
+      expect(old.actingGuide, ['Starts most conversations']);
+      expect(ChatAnalysis.fromJson(a.toJson())!.acting, ['Rarely asks back']);
+    });
   });
 
   group('the style guide', () {

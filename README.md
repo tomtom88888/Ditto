@@ -21,10 +21,11 @@ AI provider you choose (OpenAI, Claude or Gemini), made with your own key.
   on. Tweak any of them (*Shorter*, *Warmer*, *More like me*), copy it a bubble
   at a time, or star it to teach the chat something new.
 - **Analysis.** Per chat, a model reads a sample of the whole history and
-  writes **How you write**: a guide to how you text that person, with your
-  own phrases quoted. Every reply, tweak, opener and rewrite for them
-  follows it. Alongside: how you act, how they act, what goes on between
-  you, and things they've told you worth remembering.
+  writes **How you write** (how your texts look and sound, with your own
+  phrases quoted) and **How you act** (how keen you come across, who asks
+  back, how you tease, flirt and handle plans). Every reply, tweak, opener
+  and rewrite for them follows both. Alongside: how they act, what goes on
+  between you, and things they've told you worth remembering.
 - **Search.** Find a moment by describing it in your own words ("that place
   she wanted to go"). One embedding call; the ranking happens on the phone,
   using a tight fingerprint of each moment, keyword scoring (BM25), and only
@@ -136,10 +137,13 @@ your chat with that person (or all your chats, if you turn on **Also learn
 from my other chats** in the *Replying to* sheet, or reply to *Someone
 else*). Retrieval takes a shortlist by similarity, then picks varied
 examples, nudged towards recent ones. Those real exchanges go into the
-request as actual turns of the conversation, closest last, and the model is
-told it *is* you texting that person, with your measured habits, a sample of
-your recent messages, your How you write guide, facts from Analysis, and your note ("say I'll be
-late"). Several drafts come back in one request; each is held to your habits
+request as reference moments, closest last: they show how you act and sound,
+and the model is told never to mention or continue anything from them, since
+they come from other conversations. The model is told it *is* you texting
+that person and should act like you, not just write like you, with your
+measured habits, a sample of your messages (also reference only), your How
+you write and How you act guides, facts from Analysis, and your note ("say
+I'll be late"). Several drafts come back in one request; each is held to your habits
 where the numbers are clear (no capitals you never use, no emoji if you send
 none) and the most typical are kept.
 
@@ -273,7 +277,7 @@ lib/
     reply_generator.dart     prompts, drafts and tweaks
     style_conformer.dart     holds drafts to your habits
     chat_facts.dart          things to remember (Analysis)
-    chat_analysis.dart       How you write, and how you both act
+    chat_analysis.dart       How you write and act, how you both act
     chat_search.dart         Search
     chat_groupings.dart      groupings, plus group_map and topic_timeline
     finetune_service.dart    JSONL, cost estimate, job polling

@@ -13,6 +13,7 @@ class ChatAnalysis {
   const ChatAnalysis({
     required this.at,
     this.writing = const [],
+    this.acting = const [],
     this.you = const [],
     this.them = const [],
     this.together = const [],
@@ -24,7 +25,13 @@ class ChatAnalysis {
   /// follow. Fed to every reply written to them.
   final List<String> writing;
 
-  /// How you act in the chat.
+  /// How you behave with this person, as instructions another writer could
+  /// follow: what you react to and how, initiative, interest, humour. Fed to
+  /// every reply written to them, next to [writing].
+  final List<String> acting;
+
+  /// How you act in the chat, as observations. Older analyses have only
+  /// this, not [acting].
   final List<String> you;
 
   /// How they act.
@@ -33,12 +40,20 @@ class ChatAnalysis {
   /// What goes on between you.
   final List<String> together;
 
+  /// How replies should act: [acting], or for an older analysis, [you].
+  List<String> get actingGuide => acting.isNotEmpty ? acting : you;
+
   bool get isEmpty =>
-      writing.isEmpty && you.isEmpty && them.isEmpty && together.isEmpty;
+      writing.isEmpty &&
+      acting.isEmpty &&
+      you.isEmpty &&
+      them.isEmpty &&
+      together.isEmpty;
 
   Map<String, Object?> toJson() => {
     'at': at.millisecondsSinceEpoch,
     'writing': writing,
+    'acting': acting,
     'you': you,
     'them': them,
     'together': together,
@@ -52,6 +67,7 @@ class ChatAnalysis {
           ? DateTime.fromMillisecondsSinceEpoch(at.toInt())
           : DateTime.now(),
       writing: _lines(json['writing']),
+      acting: _lines(json['acting']),
       you: _lines(json['you']),
       them: _lines(json['them']),
       together: _lines(json['together']),
@@ -145,18 +161,27 @@ class ChatAnalyst {
         'Write in English, but quote $me\'s words and phrases exactly as '
         'written, in their own language.\n\n'
         'Answer only with JSON:\n'
-        '{"writing": [...], "you": [...], "them": [...], "together": [...]}\n\n'
-        '"writing" is the most important: 8 to 14 short lines that tell '
-        'another writer exactly how to text $other the way $me does, '
+        '{"writing": [...], "acting": [...], "them": [...], '
+        '"together": [...]}\n\n'
+        '"writing" and "acting" matter most: together they must let another '
+        'writer pass as $me with $other.\n'
+        '"writing": 8 to 12 short lines on how $me\'s texts look and sound, '
         'specific enough to imitate. Cover length and rhythm, splitting into '
         'bubbles, casing and punctuation, spelling, slang and abbreviations, '
-        'which language and how languages mix, emoji and laughter, tone '
-        '(warm, dry, teasing, direct), how $me asks things, agrees, says no, '
-        'shows interest or flirts, how $me opens and ends conversations, and '
-        'the words and phrases $me uses most, quoted. Say what $me never '
-        'does too. No generic advice: only what these messages show.\n'
-        '"you": 3 to 6 observations about how $me acts in this chat: effort, '
-        'who drives it, humour, how interested $me seems, habits.\n'
+        'which language and how languages mix, emoji and laughter, and the '
+        'words and phrases $me uses most, quoted. Say what $me never does '
+        'too.\n'
+        '"acting": 8 to 12 short lines on how $me behaves with $other, as '
+        'instructions to act the same way. Cover how much $me cares to '
+        'answer and how keen or unbothered $me comes across, whether $me '
+        'matches $other\'s energy, who takes the initiative and how often '
+        '$me asks back, what $me picks up on and what $me ignores, how $me '
+        'teases, jokes, flirts or shows interest, how $me takes compliments, '
+        'news and pushback, how $me makes, accepts or dodges plans, what $me '
+        'shares about themselves, how $me opens and ends conversations, and '
+        'what $me would never do. Give a short example from the messages '
+        'where it helps.\n'
+        'No generic advice in either: only what these messages show.\n'
         '"them": 3 to 6 about how $other act${group ? "" : "s"} towards $me, '
         'from what they wrote.\n'
         '"together": 2 to 4 about what goes on between them: what they bond '

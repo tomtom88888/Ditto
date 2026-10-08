@@ -208,10 +208,10 @@ void main() {
     String content(int i) => (messages[i] as Map)['content'] as String;
     // The live chat is the last turn, your own line marked.
     expect(content(messages.length - 1), 'pub later?\n(you) maybe\ngo on');
-    // The stored exchange is in as a real turn: theirs, then your reply.
-    expect(content(1), 'pub?');
-    expect(content(2), 'go on then');
+    // The stored exchange is in the system prompt as a reference moment.
+    expect(messages, hasLength(2));
     final system = content(0);
+    expect(system, contains('Them: pub?\nMe: go on then'));
     expect(system, contains("Measured from 10 of Robin's real replies"));
     expect(system, contains('a line break means a separate bubble'));
     expect(system, contains('- go on then'), reason: 'the voice sample');
