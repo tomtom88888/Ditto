@@ -1,10 +1,21 @@
+import 'dart:convert';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:replylikeme/models/app_settings.dart';
 import 'package:replylikeme/models/blind_test.dart';
 import 'package:replylikeme/models/stored_exchange.dart';
 import 'package:replylikeme/services/blind_test.dart';
+import 'package:replylikeme/services/blind_test_store.dart';
+import 'package:replylikeme/services/memory_exchange_store.dart';
+import 'package:replylikeme/services/openai_exception.dart';
+import 'package:replylikeme/services/reply_generator.dart';
+import 'package:replylikeme/services/style_memory_service.dart';
 import 'package:replylikeme/services/vector_math.dart';
+import 'package:replylikeme/state/providers.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import 'explore_features_test.dart' show turn;
+import 'explore_features_test.dart' show chat, fake, turn;
 
 StoredExchange moment({
   required int id,
@@ -42,6 +53,8 @@ BlindPair pair({
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('pickMoments', () {
     final all = [for (var i = 1; i <= 40; i++) moment(id: i)];
 
@@ -255,5 +268,165 @@ void main() {
     expect(p.userPick, 'A');
     expect(back.runs.single.at, DateTime(2026, 10, 12, 9));
     expect(BlindTestState.fromJson('nonsense'), isNull);
+  });
+
+  group('a run', () {
+    setUp(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
+
+    final start = DateTime(2026, 1, 1, 12);
+    // 25 moments a day apart, each reply unique so a leak would show.
+    final rows = [
+      for (var i = 1; i <= 25; i++)
+        StoredExchange(
+          id: i,
+          chatId: 1,
+          context: [turn('Maya', 'question $i')],
+          contextText: 'Maya: question $i',
+          replyText: 'real answer $i',
+          vector: VectorMath.normalise([1, 0]),
+          timestamp: start.add(Duration(days: i)),
+        ),
+    ];
+    const settings = AppSettings(
+      myName: 'Robin',
+      theirName: 'Maya',
+      embeddingDimensions: 2,
+    );
+
+    BlindTester tester(List<Map<String, Object?>> sent, {int rowCount = 25}) {
+      final openai = fake(
+        sent: sent,
+        embed: (_) => [1, 0],
+        answer: (body) => body.containsKey('response_format')
+            ? '{"pick": "A", "why": "too keen"}'
+            : 'generated',
+      );
+      return BlindTester(
+        memory: StyleMemoryService(
+          openai: openai,
+          store: MemoryExchangeStore(
+            chats: [chat()],
+            rows: rows.take(rowCount).toList(),
+          ),
+        ),
+        generator: ReplyGenerator(openai: openai),
+        openai: openai,
+      );
+    }
+
+    test('writes and judges every moment for every prompt', () async {
+      final sent = <Map<String, Object?>>[];
+      final progress = <double>[];
+      final run = await tester(sent).run(
+        chat: chat(),
+        settings: settings,
+        prompts: const [
+          BlindPrompt(label: BlindPrompt.builtIn, text: 'PROMPT ONE {me}'),
+          BlindPrompt(label: BlindPrompt.tryThis, text: 'PROMPT TWO {me}'),
+        ],
+        seed: 3,
+        onProgress: (done, of) => progress.add(done / of),
+      );
+      expect(run.results, hasLength(2));
+      expect(run.promptVersion, ReplyGenerator.promptVersion);
+      for (final r in run.results) {
+        expect(r.pairs, hasLength(BlindTest.momentCount));
+        for (final p in r.pairs) {
+          expect(p.generated, 'generated');
+          expect(p.real, startsWith('real answer'));
+          expect(p.judgePick, 'A');
+          expect(p.why, 'too keen');
+        }
+      }
+      expect(progress.last, 1.0);
+
+      final generations = [
+        for (final b in sent)
+          if (b.containsKey('messages') && !b.containsKey('response_format')) b,
+      ];
+      expect(generations, hasLength(40));
+      String system(Map<String, Object?> b) =>
+          ((b['messages']! as List).first as Map)['content'] as String;
+      expect(
+        generations.where((b) => system(b).startsWith('PROMPT ONE Robin')),
+        hasLength(20),
+      );
+      expect(
+        generations.where((b) => system(b).startsWith('PROMPT TWO Robin')),
+        hasLength(20),
+      );
+
+      // The writer never sees the reply it is being tested on.
+      for (final r in run.results) {
+        for (final (i, p) in r.pairs.indexed) {
+          final asked = generations.where(
+            (b) =>
+                ((b['messages']! as List).last as Map)['content'] ==
+                p.context.last.text,
+          );
+          // "real answer 1" must not match "real answer 12".
+          final held = RegExp(
+            '${RegExp.escape(p.real)}'
+            r'(?!\d)',
+          );
+          expect(asked, isNotEmpty);
+          for (final b in asked) {
+            expect(
+              held.hasMatch(jsonEncode(b['messages'])),
+              isFalse,
+              reason: 'pair $i',
+            );
+          }
+        }
+      }
+    });
+
+    test('needs a few of your replies to be worth running', () async {
+      expect(
+        tester([], rowCount: 3).run(
+          chat: chat(),
+          settings: settings,
+          prompts: const [BlindPrompt(label: BlindPrompt.builtIn, text: 'p')],
+          seed: 1,
+        ),
+        throwsA(isA<OpenAiException>()),
+      );
+    });
+  });
+
+  group('the store', () {
+    setUp(() => SharedPreferences.setMockInitialValues(<String, Object>{}));
+
+    test('keeps each chat apart, and forgets on request', () async {
+      const store = BlindTestStore();
+      expect(await store.forChat(1), isNull);
+      await store.save(1, const BlindTestState(seed: 1, tryThis: 'a'));
+      await store.save(2, const BlindTestState(seed: 2));
+      expect((await store.forChat(1))!.tryThis, 'a');
+      expect((await store.forChat(2))!.seed, 2);
+      await store.remove(1);
+      expect(await store.forChat(1), isNull);
+      expect(await store.forChat(2), isNotNull);
+      await store.clear();
+      expect(await store.forChat(2), isNull);
+    });
+
+    test('goes with its chat', () async {
+      const store = BlindTestStore();
+      await store.save(1, const BlindTestState(seed: 1));
+      await store.save(2, const BlindTestState(seed: 2));
+      final container = ProviderContainer(
+        overrides: [
+          exchangeStoreProvider.overrideWithValue(
+            MemoryExchangeStore(chats: [chat(), chat(id: 2)]),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(chatsProvider.future);
+      await container.read(chatsProvider.notifier).delete(1);
+      expect(await store.forChat(1), isNull);
+      expect(await store.forChat(2), isNotNull);
+    });
   });
 }

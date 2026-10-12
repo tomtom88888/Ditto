@@ -1,9 +1,14 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
+import '../models/app_settings.dart';
 import '../models/blind_test.dart';
 import '../models/chat_turn.dart';
 import '../models/stored_exchange.dart';
+import 'openai_exception.dart';
+import 'openai_service.dart';
+import 'reply_generator.dart';
+import 'style_memory_service.dart';
 
 /// Measures how often replies written in your place pass for your own.
 ///
@@ -218,5 +223,128 @@ class BlindTest {
       }
     }
     return out.toString().trimRight();
+  }
+}
+
+/// Runs the blind test on one chat, with the same retrieval and reply
+/// writing the app uses for real.
+class BlindTester {
+  const BlindTester({
+    required this.memory,
+    required this.generator,
+    required this.openai,
+  });
+
+  final StyleMemoryService memory;
+  final ReplyGenerator generator;
+  final OpenAiService openai;
+
+  /// Fewer fair moments than this and a score would mean nothing.
+  static const int minMoments = 5;
+
+  /// Tests each of [prompts] on the same moments from [chat], picked by
+  /// [seed]. [settings] must carry the chat's names. [onProgress] is told
+  /// after each moment; throwing from it stops the run.
+  Future<BlindRun> run({
+    required ChatMemory chat,
+    required AppSettings settings,
+    required List<BlindPrompt> prompts,
+    required int seed,
+    void Function(int done, int of)? onProgress,
+  }) async {
+    final rows = await memory.store.all(chatIds: {chat.id});
+    final moments = BlindTest.pickMoments(
+      rows,
+      me: settings.myName,
+      seed: seed,
+    );
+    if (moments.length < minMoments) {
+      throw OpenAiException(
+        OpenAiErrorKind.badRequest,
+        "There aren't enough of your replies to ${settings.theirName} to "
+        'test with: it needs at least $minMoments.',
+      );
+    }
+
+    final pairs = [for (final _ in prompts) <BlindPair>[]];
+    onProgress?.call(0, moments.length);
+    for (final (i, moment) in moments.indexed) {
+      final exclude = BlindTest.excluding(moment);
+      final retrieved = await memory.retrieve(
+        context: moment.context,
+        embeddingModel: settings.embeddingModel,
+        dimensions: settings.embeddingDimensions,
+        limit: settings.retrievedExampleCount,
+        chatIds: {chat.id},
+        preferChatId: chat.id,
+        queryTurns: settings.contextTurns,
+        exclude: exclude,
+      );
+      final voice = await memory.voiceSample(
+        chatIds: {chat.id},
+        preferChatId: chat.id,
+        exclude: exclude,
+      );
+      final realIsA = math.Random(seed + i).nextBool();
+      for (final (j, prompt) in prompts.indexed) {
+        final replies = await generator.generate(
+          conversation: moment.context,
+          examples: retrieved.examples,
+          settings: settings.copyWith(
+            systemPrompt: prompt.text,
+            variantCount: 1,
+          ),
+          profile: chat.profile,
+          voiceSample: voice,
+          group: chat.isGroup,
+        );
+        final generated = replies.isEmpty ? '' : replies.first.text;
+        final real = moment.replyText;
+        final raw = await openai.chat(
+          model: settings.generationModel,
+          messages: [
+            {
+              'role': 'system',
+              'content': BlindTest.judgeSystem(
+                me: settings.myName,
+                them: settings.theirName,
+                realReplies: voice.take(BlindTest.judgeSampleCount).toList(),
+              ),
+            },
+            {
+              'role': 'user',
+              'content': BlindTest.judgeUser(
+                context: moment.context,
+                a: realIsA ? real : generated,
+                b: realIsA ? generated : real,
+              ),
+            },
+          ],
+          jsonMode: true,
+          temperature: 0,
+        );
+        final (pick, why) = BlindTest.parseJudge(raw);
+        pairs[j].add(
+          BlindPair(
+            context: moment.context,
+            real: real,
+            generated: generated,
+            realIsA: realIsA,
+            judgePick: pick,
+            why: why,
+          ),
+        );
+      }
+      onProgress?.call(i + 1, moments.length);
+    }
+    return BlindRun(
+      at: DateTime.now(),
+      replyModel: settings.generationModel,
+      promptVersion: ReplyGenerator.promptVersion,
+      results: [
+        for (final (j, prompt) in prompts.indexed)
+          BlindPromptResult(prompt: prompt, pairs: pairs[j]),
+      ],
+    );
   }
 }

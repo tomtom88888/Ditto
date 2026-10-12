@@ -6,6 +6,8 @@ import '../models/app_settings.dart';
 import '../models/stored_exchange.dart';
 import '../models/suggestion_feedback.dart';
 import '../services/ask_chats.dart';
+import '../services/blind_test.dart';
+import '../services/blind_test_store.dart';
 import '../services/chart_maker.dart';
 import '../services/chat_analysis.dart';
 import '../services/chat_facts.dart';
@@ -44,6 +46,10 @@ final factsStoreProvider = Provider<FactsStore>((ref) => const FactsStore());
 
 final analysisStoreProvider = Provider<AnalysisStore>(
   (ref) => const AnalysisStore(),
+);
+
+final blindTestStoreProvider = Provider<BlindTestStore>(
+  (ref) => const BlindTestStore(),
 );
 
 /// Typed as the interface so tests can substitute an in-memory store.
@@ -189,6 +195,14 @@ final chatSearchProvider = Provider<ChatSearch?>((ref) {
   return ChatSearch(openai: openai, store: ref.watch(exchangeStoreProvider));
 });
 
+final blindTesterProvider = Provider<BlindTester?>((ref) {
+  final openai = ref.watch(openAiServiceProvider);
+  final memory = ref.watch(styleMemoryServiceProvider);
+  final generator = ref.watch(replyGeneratorProvider);
+  if (openai == null || memory == null || generator == null) return null;
+  return BlindTester(memory: memory, generator: generator, openai: openai);
+});
+
 final askChatsProvider = Provider<AskChats?>((ref) {
   final openai = ref.watch(openAiServiceProvider);
   final search = ref.watch(chatSearchProvider);
@@ -242,6 +256,7 @@ class ChatsNotifier extends AsyncNotifier<List<ChatMemory>> {
     // What was learned about them goes with the chat.
     await ref.read(factsStoreProvider).remove(chatId);
     await ref.read(analysisStoreProvider).remove(chatId);
+    await ref.read(blindTestStoreProvider).remove(chatId);
     await reload();
   }
 }
@@ -301,6 +316,7 @@ class DataWiper {
     await _ref.read(groupingsStoreProvider).clear();
     await _ref.read(factsStoreProvider).clear();
     await _ref.read(analysisStoreProvider).clear();
+    await _ref.read(blindTestStoreProvider).clear();
     if (includeApiKey) await _ref.read(apiKeysProvider.notifier).clear();
     _ref.invalidate(settingsProvider);
     _ref.invalidate(exchangeStoreProvider);
