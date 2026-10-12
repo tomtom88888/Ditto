@@ -201,10 +201,7 @@ void main() {
         ],
         settings: settings,
       );
-      expect(
-        messages.first['content'],
-        contains('Sam: pub?\nAlex: yes\nMe: same'),
-      );
+      expect(messages[1]['content'], 'Sam: pub?\nAlex: yes');
     });
 
     test('the fine-tuning dataset names members too', () {

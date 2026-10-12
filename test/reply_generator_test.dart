@@ -156,30 +156,27 @@ void main() {
     String system(List<Map<String, Object?>> m) =>
         m.first['content']! as String;
 
-    test('puts your real replies in as reference moments, not turns', () {
+    test('puts your real replies in as your own earlier messages', () {
       final m = build();
-      // Only the live chat is a turn, so nothing from other chats can be
-      // taken for part of this one.
-      expect(m.map((x) => x['role']), ['system', 'user']);
-      final text = system(m);
-      expect(text, contains('not part of this conversation'));
-      expect(text, contains('Never mention, continue, answer'));
-      // Least similar first, so the closest match comes last.
-      final cinema = text.indexOf('Them: cinema?\nMe: nah skint');
-      final drinks = text.indexOf('Them: drinks tonight?\nMe: go on then');
-      expect(cinema, greaterThan(0));
-      expect(drinks, greaterThan(cinema));
+      expect(m.map((x) => x['role']), [
+        'system',
+        'user',
+        'assistant',
+        'user',
+        'assistant',
+        'user',
+      ]);
+      // Least similar first, so the closest match sits next to the live chat.
+      expect(m[1]['content'], 'cinema?');
+      expect(m[2]['content'], 'nah skint');
+      expect(m[3]['content'], 'drinks tonight?');
+      expect(m[4]['content'], 'go on then');
     });
 
-    test('asks for how you act, not only how you write', () {
+    test('describes neither reference moments nor how you act', () {
       final text = system(build());
-      expect(text, contains('Act like you too'));
-      final withActing = ReplyGenerator.buildSystemPrompt(
-        settings,
-        acting: const ['Rarely asks back'],
-      );
-      expect(withActing, contains('How Robin acts with Sam'));
-      expect(withActing, contains('- Rarely asks back'));
+      expect(text, isNot(contains('Reference moments')));
+      expect(text, isNot(contains('Act like you too')));
     });
 
     test('ends with the live chat, your earlier lines marked', () {
@@ -231,7 +228,10 @@ void main() {
       final text = system(build());
       expect(text, contains('You are Robin'));
       expect(text, contains('not an assistant'));
-      expect(text, contains('Reply to that conversation only'));
+      expect(
+        text,
+        contains('each assistant message is exactly what Robin sent back'),
+      );
       expect(text, isNot(contains('{me}')));
     });
 
