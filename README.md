@@ -52,8 +52,16 @@ AI provider you choose (OpenAI, Claude or Gemini), made with your own key.
   chat" puts it back.
 - **Chat data.** Reply times, who texts first, double texts, busiest days,
   favourite words and emoji. Counted on the phone, no API calls.
+- **Blind test.** From a chat's menu on the home screen: 20 real moments
+  with your reply hidden, a reply written in your place for each, and a
+  judge model guessing which one you sent. Compare up to three prompts on
+  the same moments (the built-in one, yours from Settings, and one to try),
+  see which passes as you more often and whether the gap is more than luck,
+  read what gave each away, and take on a better prompt in one tap. **Spot
+  the real one** lets you guess too; **Copy results** shares the scores,
+  with or without the chat lines.
 
-Long jobs (importing, Analysis, groupings) run in the background with a
+Long jobs (importing, Analysis, groupings, blind tests) run in the background with a
 progress tray at the bottom of every screen. You can leave the screen or
 switch apps; on Android a "Ditto is working" notification keeps the job
 alive until it finishes.
@@ -147,6 +155,15 @@ capitals you never use, no emoji if you send none). A draft that brings in a
 name, place or time only the examples had is set aside, since those come
 from other conversations. The most typical of the rest are kept.
 
+**Blind test.** Each moment is written exactly as a real reply would be,
+except that the moment itself and everything within 12 hours of it are kept
+from the writer: the exchanges just after it have your real reply in their
+lead-up. The judge sees the moment, about 15 of your other real replies to
+know you by, and the two messages in a random order. The same moments are
+used until you ask for new ones, so prompts and versions can be compared;
+two scores are called clearly different only when a two-proportion test
+puts the gap beyond luck (p < 0.1).
+
 **Fine-tuning (optional, OpenAI only, costs money).** The same exchanges can
 be uploaded as JSONL to train a model; the app shows the cost and asks you to
 confirm the amount first. OpenAI is retiring fine-tuning: new organisations
@@ -198,8 +215,9 @@ app stored, optionally including the keys.
   storage on the phone.
 - What is sent to your AI provider: the text being fingerprinted when
   importing (and a search query), the screenshot you pick, the prompt when
-  writing a reply, a sample of the chat when you run Analysis, and a
-  few short samples per group when naming groupings. Nothing goes anywhere
+  writing a reply, a sample of the chat when you run Analysis, a few
+  short samples per group when naming groupings, and the moments, your
+  real replies and the prompts being compared when you run a blind test. Nothing goes anywhere
   else.
 - `.gitignore` blocks `*.txt`, `*.zip` and `*.jsonl` outside `test/fixtures/`,
   so a WhatsApp export can't be committed by accident. Instagram's `.json`
@@ -219,7 +237,7 @@ app stored, optionally including the keys.
 git clone https://github.com/tomtom88888/ChatingTools.git
 cd ChatingTools
 flutter pub get
-flutter test          # 385 tests, no network or device needed
+flutter test          # 409 tests, no network or device needed
 flutter run
 ```
 
@@ -280,6 +298,8 @@ lib/
     chat_analysis.dart       How you write and act, how you both act
     chat_search.dart         Search
     chat_groupings.dart      groupings, plus group_map and topic_timeline
+    leak_guard.dart          drops drafts that borrow from other chats
+    blind_test.dart          the blind test: moments, judge, scores, report
     finetune_service.dart    JSONL, cost estimate, job polling
     secure_key_store.dart    the API keys
   state/
@@ -287,12 +307,13 @@ lib/
     tasks.dart               background jobs and their tray
     keep_awake.dart          Android foreground service while work runs
     app_activity.dart        notices the app leaving and returning
-  screens/                   setup, home, import, reply, search, remember,
-                             groupings, chat data, settings, fine-tune
+  screens/                   setup, home, import, reply, search, analysis,
+                             groupings, chat data, blind test, settings,
+                             fine-tune
   theme/                     palettes, type, and per-app bubble colours
   widgets/                   shared UI kit, export guides, job cards, tray
 android/.../MainActivity.kt  keeps the Flutter engine beyond the screen
-test/                        385 unit and widget tests
+test/                        409 unit and widget tests
 test/fixtures/               invented Android and iOS exports
 docs/business-plan.txt       backlog: how it could be sold one day
 ```
@@ -303,11 +324,12 @@ docs/business-plan.txt       backlog: how it could be sold one day
 flutter test
 ```
 
-385 tests, none needing a network or device. They cover both parsers
+409 tests, none needing a network or device. They cover both parsers
 (including Instagram's encoding repair and multi-file threads), the
 OpenAI/Claude/Gemini request and response shapes, error mapping, retries and
 resuming after the app was away, retrieval and the vector maths, prompt
-building, Analysis, Search and groupings, the SQLite store and its upgrades
+building and the leak guard, Analysis, Search and groupings, the blind
+test, the SQLite store and its upgrades
 (against real SQLite via `sqflite_common_ffi`), background jobs and the tray,
 and widget tests that boot the real app: setup and key checks, home,
 settings, importing, and the whole reply flow.

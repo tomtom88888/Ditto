@@ -324,10 +324,10 @@ Answer only with JSON: {"pick": "A" or "B", "why": "<one short line: what gave t
   `ReplyGenerator.buildUserPrompt`, then `\n\nA: …\nB: …`.
 - [ ] **Step 4: Run** — PASS. **Step 5: Commit** "Blind test: moments, judging and scores".
 
-### Task 7: `BlindTest.run` and the store
+### Task 7: `BlindTester.run` and the store
 
 **Files:**
-- Modify: `lib/services/blind_test.dart` (instance with `openai`, `memory`, `generator`; `run`)
+- Modify: `lib/services/blind_test.dart` (add `BlindTester`, holding `openai`, `memory`, `generator`, with `run`; `BlindTest` stays static helpers)
 - Create: `lib/services/blind_test_store.dart`
 - Modify: `lib/state/providers.dart` (`blindTestStoreProvider`,
   `blindTestProvider` (nullable like the others), clear in delete-all and in
@@ -337,15 +337,14 @@ Answer only with JSON: {"pick": "A" or "B", "why": "<one short line: what gave t
 **Interfaces:**
 
 ```dart
-class BlindTest {
-  BlindTest({required this.memory, required this.generator, required this.openai});
+class BlindTester {
+  const BlindTester({required this.memory, required this.generator, required this.openai});
   Future<BlindRun> run({
     required ChatMemory chat,
     required AppSettings settings,     // named for the chat
     required List<BlindPrompt> prompts,
     required int seed,
-    void Function(double progress)? onProgress,
-    bool Function()? cancelled,
+    void Function(int done, int of)? onProgress,   // throwing from it stops the run
   });
 }
 class BlindTestStore { load(); forChat(int); save(int, BlindTestState); remove(int); clear(); }  // key 'ditto_blind_test_v1'
@@ -370,7 +369,7 @@ class BlindTestStore { load(); forChat(int); save(int, BlindTestState); remove(i
   `generator.generate(conversation: m.context, examples: retrieved.examples, settings: settings.copyWith(systemPrompt: p.text, variantCount: 1), profile: chat.profile, voiceSample: voice, group: chat.isGroup)`,
   `realIsA = Random(seed + i).nextBool()`, judge via
   `openai.chat(model: settings.generationModel, jsonMode: true, temperature: 0, messages: …)`.
-  Check `cancelled` between calls and throw `TaskCancelled`.
+  Stopping is the screen's job: its `onProgress` calls `task.check()`, which throws `TaskCancelled`.
 - [ ] **Step 4: Run** — PASS. **Step 5: Commit** "Blind test runs against your chat".
 
 ### Task 8: Blind test screen and the Home menu item
