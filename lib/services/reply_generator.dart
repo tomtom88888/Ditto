@@ -6,6 +6,7 @@ import '../models/extracted_message.dart';
 import '../models/reply_suggestion.dart';
 import '../models/stored_exchange.dart';
 import '../models/style_profile.dart';
+import 'leak_guard.dart';
 import 'openai_exception.dart';
 import 'openai_service.dart';
 import 'style_conformer.dart';
@@ -142,11 +143,17 @@ class ReplyGenerator {
           acting: acting,
         );
 
+    final risky = LeakGuard.risky(
+      [for (final e in examples) e.exchange],
+      conversation,
+      names: {settings.myName, settings.theirName},
+    );
     final answers = await _bestDrafts(
       messagesFor(newTopic: false),
       settings: settings,
       profile: profile,
       keep: replies,
+      risky: risky,
     );
     final suggestions = [
       for (final text in answers) ReplySuggestion.reply(text),
@@ -157,6 +164,7 @@ class ReplyGenerator {
         settings: settings,
         profile: profile,
         keep: 1,
+        risky: risky,
       );
       // Only labelled a topic change because it was asked for as one.
       suggestions.addAll([
@@ -168,12 +176,14 @@ class ReplyGenerator {
   }
 
   /// Writes drafts, tidies and conforms them, and keeps the [keep] most like
-  /// you.
+  /// you. Drafts using a [risky] word ([LeakGuard]) are set aside, unless
+  /// that would leave nothing.
   Future<List<String>> _bestDrafts(
     List<ChatMessageJson> messages, {
     required AppSettings settings,
     required StyleProfile profile,
     required int keep,
+    Set<String> risky = const {},
   }) async {
     final drafts = await openai.chatDrafts(
       model: settings.effectiveGenerationModel,
@@ -192,7 +202,14 @@ class ReplyGenerator {
       if (text.isEmpty || !seen.add(text.toLowerCase())) continue;
       cleaned.add(text);
     }
-    return StyleConformer.rank(cleaned, profile).take(keep).toList();
+    final safe = [
+      for (final text in cleaned)
+        if (!LeakGuard.leaks(text, risky)) text,
+    ];
+    return StyleConformer.rank(
+      safe.isEmpty ? cleaned : safe,
+      profile,
+    ).take(keep).toList();
   }
 
   /// Messages to start the chat with [settings.theirName] again after it

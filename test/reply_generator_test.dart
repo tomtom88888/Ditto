@@ -354,6 +354,31 @@ void main() {
       expect(sent.first.containsKey('response_format'), isFalse);
     });
 
+    test('sets aside drafts that bring in names from the examples', () async {
+      final generator = ReplyGenerator(
+        openai: serviceThat((body) => ['say hi to Josh', 'sounds good']),
+      );
+      final variants = await generator.generate(
+        conversation: [turn('Sam', 'pub?')],
+        examples: [example('drinks?', 'only if Josh comes', 0.8)],
+        settings: settings.copyWith(variantCount: 1),
+      );
+      expect(variants.map((v) => v.text), ['sounds good']);
+    });
+
+    test('keeps a leaking draft when every draft leaks', () async {
+      final generator = ReplyGenerator(
+        openai: serviceThat((body) => ['Josh?', 'Josh!']),
+      );
+      final variants = await generator.generate(
+        conversation: [turn('Sam', 'pub?')],
+        examples: [example('drinks?', 'only if Josh comes', 0.8)],
+        settings: settings.copyWith(variantCount: 1),
+      );
+      expect(variants, hasLength(1));
+      expect(variants.single.text, startsWith('Josh'));
+    });
+
     test('with one option asked for, there is no topic change', () async {
       final sent = <Map<String, Object?>>[];
       final generator = ReplyGenerator(
