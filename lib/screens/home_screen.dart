@@ -17,6 +17,7 @@ import '../widgets/paper_dialog.dart';
 import '../widgets/paper_ui.dart';
 import 'analysis_screen.dart';
 import 'ask_screen.dart';
+import 'blind_test_screen.dart';
 import 'chat_data_screen.dart';
 import 'chat_groupings_screen.dart';
 import 'check_screen.dart';
@@ -226,6 +227,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     onDelete: _confirmDelete,
                     onDates: (chat, {whole = false}) =>
                         _chooseDates(chat, whole: whole),
+                    onBlindTest: (chat) => _push(BlindTestScreen(chat: chat)),
                     onAdd: openTrain,
                   ),
                   if (enabled.where((c) => c.isOutOfDate()).toList()
@@ -373,6 +375,7 @@ class _ChatList extends StatelessWidget {
     required this.onOpen,
     required this.onDelete,
     required this.onDates,
+    required this.onBlindTest,
     required this.onAdd,
   });
 
@@ -380,6 +383,7 @@ class _ChatList extends StatelessWidget {
   final ValueChanged<ChatMemory> onOpen;
   final ValueChanged<ChatMemory> onDelete;
   final void Function(ChatMemory chat, {bool whole}) onDates;
+  final ValueChanged<ChatMemory> onBlindTest;
   final VoidCallback onAdd;
 
   @override
@@ -399,6 +403,7 @@ class _ChatList extends StatelessWidget {
                 onTap: () => onOpen(chat),
                 onDelete: () => onDelete(chat),
                 onDates: ({whole = false}) => onDates(chat, whole: whole),
+                onBlindTest: () => onBlindTest(chat),
               ),
             _AddChatRow(onTap: onAdd),
           ],
@@ -444,12 +449,14 @@ class _ChatRow extends StatelessWidget {
     required this.onTap,
     required this.onDelete,
     required this.onDates,
+    required this.onBlindTest,
   });
 
   final ChatMemory chat;
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final void Function({bool whole}) onDates;
+  final VoidCallback onBlindTest;
 
   @override
   Widget build(BuildContext context) {
@@ -565,6 +572,10 @@ class _ChatRow extends StatelessWidget {
                     ),
                   ),
                 PopupMenuItem(
+                  value: 'blind',
+                  child: Text('Blind test…', style: Type.strong(size: 14)),
+                ),
+                PopupMenuItem(
                   value: 'delete',
                   child: Text(
                     'Forget this chat',
@@ -575,6 +586,7 @@ class _ChatRow extends StatelessWidget {
               onSelected: (choice) => switch (choice) {
                 'dates' => onDates(),
                 'whole' => onDates(whole: true),
+                'blind' => onBlindTest(),
                 _ => onDelete(),
               },
             ),
