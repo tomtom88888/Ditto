@@ -94,6 +94,11 @@ class ReplyGenerator {
   /// How many drafts are written for each reply that is kept.
   static const int draftsPerReply = 2;
 
+  /// Which version of the built-in prompt and request this is, so blind
+  /// test runs can say what they measured. Bump it whenever either changes
+  /// in a way that could change how replies come out.
+  static const int promptVersion = 2;
+
   /// Generates [AppSettings.variantCount] suggestions: all but the last
   /// answer what was just said; the last changes the subject.
   Future<List<ReplySuggestion>> generate({
