@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/app_settings.dart';
 import '../models/stored_exchange.dart';
-import '../services/chat_facts.dart';
 import '../state/providers.dart';
 import '../theme/tokens.dart';
 import '../widgets/chat_picker.dart';
@@ -62,13 +61,6 @@ class _OpenersScreenState extends ConsumerState<OpenersScreen> {
         chatIds: {chat.id},
         preferChatId: chat.id,
       );
-      final facts = [
-        for (final f
-            in (await ref.read(factsStoreProvider).forChat(chat.id))?.facts ??
-                const <ChatFact>[])
-          f.text,
-      ];
-      final analysis = await ref.read(analysisStoreProvider).forChat(chat.id);
       final openers = await generator.openers(
         settings: settings.copyWith(
           myName: chat.myName.isEmpty ? 'Me' : chat.myName,
@@ -77,9 +69,6 @@ class _OpenersScreenState extends ConsumerState<OpenersScreen> {
         recent: recent,
         profile: chat.profile,
         voiceSample: voice,
-        facts: facts,
-        styleGuide: analysis?.writing ?? const [],
-        acting: analysis?.actingGuide ?? const [],
         note: _note.text,
         quietFor: quietFor(chat.lastMessageAt),
         group: chat.isGroup,

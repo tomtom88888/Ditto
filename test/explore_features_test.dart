@@ -17,7 +17,6 @@ import 'package:replylikeme/services/chat_groupings.dart';
 import 'package:replylikeme/services/chat_search.dart';
 import 'package:replylikeme/services/memory_exchange_store.dart';
 import 'package:replylikeme/services/openai_service.dart';
-import 'package:replylikeme/services/reply_generator.dart';
 import 'package:replylikeme/services/topic_timeline.dart';
 import 'package:replylikeme/services/vector_math.dart';
 import 'package:replylikeme/state/providers.dart';
@@ -231,20 +230,6 @@ void main() {
       expect(await store.forChat(2), isNotNull);
       expect(FactsStore.decode('garbage'), isEmpty);
     });
-  });
-
-  test('the reply writer is told the facts, as callbacks only', () {
-    final system = ReplyGenerator.buildSystemPrompt(
-      const AppSettings(myName: 'Robin', theirName: 'Maya'),
-      facts: const ['Has a dog called Biscuit'],
-    );
-    expect(system, contains('Things Robin knows about Maya'));
-    expect(system, contains('- Has a dog called Biscuit'));
-    expect(system, contains('never force one'));
-    expect(
-      ReplyGenerator.buildSystemPrompt(const AppSettings()),
-      isNot(contains('Things')),
-    );
   });
 
   // ----------------------------------------------------------------- search

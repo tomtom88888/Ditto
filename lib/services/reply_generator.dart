@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import '../models/app_settings.dart';
 import '../models/chat_turn.dart';
 import '../models/extracted_message.dart';
@@ -106,9 +104,6 @@ class ReplyGenerator {
     StyleProfile profile = StyleProfile.empty,
     List<String> voiceSample = const [],
     bool group = false,
-    List<String> facts = const [],
-    List<String> styleGuide = const [],
-    List<String> acting = const [],
   }) async {
     if (conversation.isEmpty) {
       throw const OpenAiException(
@@ -138,9 +133,6 @@ class ReplyGenerator {
           voiceSample: voiceSample,
           newTopic: newTopic,
           group: group,
-          facts: facts,
-          styleGuide: styleGuide,
-          acting: acting,
         );
 
     final risky = LeakGuard.risky(
@@ -213,16 +205,13 @@ class ReplyGenerator {
   }
 
   /// Messages to start the chat with [settings.theirName] again after it
-  /// went quiet: [count] options in your voice, drawing on [facts] and the
-  /// [recent] end of the chat, nudged by [note].
+  /// went quiet: [count] options in your voice, drawing on the [recent]
+  /// end of the chat, nudged by [note].
   Future<List<String>> openers({
     required AppSettings settings,
     required List<ChatTurn> recent,
     StyleProfile profile = StyleProfile.empty,
     List<String> voiceSample = const [],
-    List<String> facts = const [],
-    List<String> styleGuide = const [],
-    List<String> acting = const [],
     String note = '',
     String quietFor = '',
     bool group = false,
@@ -239,15 +228,12 @@ class ReplyGenerator {
       group: group,
       earlier: recent,
       earlierIntro: 'How the chat with $them went the last time you talked:',
-      facts: facts,
-      styleGuide: styleGuide,
-      acting: acting,
       extra:
           'There is no new message to answer: the chat has gone quiet'
           '${quietFor.isEmpty ? "" : " for $quietFor"}. Write one message $me '
           'could send to start it up again with $them. Make it easy to '
           'answer and specific to the two of them: follow up on something '
-          'from the end of the chat or from what $me knows about $them, or '
+          'from the end of the chat, or '
           'open something new they would enjoy. Open the way $me really '
           'does, with $me\'s usual energy. No "hey stranger", no '
           'apologising for the silence unless $me would.',
@@ -273,8 +259,6 @@ class ReplyGenerator {
     List<String> voiceSample = const [],
     List<ChatTurn> recent = const [],
     bool group = false,
-    List<String> styleGuide = const [],
-    List<String> acting = const [],
   }) async {
     final me = _name(settings.myName, 'the user');
     final system = buildSystemPrompt(
@@ -284,8 +268,6 @@ class ReplyGenerator {
       hasExamples: false,
       group: group,
       earlier: recent,
-      styleGuide: styleGuide,
-      acting: acting,
       earlierIntro: 'The end of the chat so far, for background:',
       extra:
           '$me has written the message in the last user message and wants '
@@ -305,77 +287,6 @@ class ReplyGenerator {
     );
   }
 
-  /// How much [draft], a message you wrote, sounds like you writing to
-  /// [settings.theirName]: judged against [styleGuide], your measured habits
-  /// and real messages you sent them.
-  Future<StyleVerdict> judgeMine({
-    required String draft,
-    required AppSettings settings,
-    StyleProfile profile = StyleProfile.empty,
-    List<String> voiceSample = const [],
-    List<String> styleGuide = const [],
-    List<String> acting = const [],
-  }) async {
-    final me = _name(settings.myName, 'the user');
-    final them = _name(settings.theirName, 'them');
-    final habits = profile.describe(me);
-    final system = StringBuffer(
-      'You judge whether a message sounds like $me texting $them: both how '
-      'it is written and how it comes across (its tone, energy and the way '
-      'it reacts). Compare it with how $me really writes to and acts with '
-      '$them, below, and nothing else: not whether it is a good message, '
-      'only whether it is $me.',
-    );
-    if (styleGuide.isNotEmpty) {
-      system
-        ..writeln()
-        ..writeln()
-        ..writeln('How $me writes to $them:')
-        ..write(styleGuide.map((l) => '- $l').join('\n'));
-    }
-    if (acting.isNotEmpty) {
-      system
-        ..writeln()
-        ..writeln()
-        ..writeln('How $me acts with $them:')
-        ..write(acting.map((l) => '- $l').join('\n'));
-    }
-    if (habits.isNotEmpty) {
-      system
-        ..writeln()
-        ..writeln()
-        ..write(habits);
-    }
-    if (voiceSample.isNotEmpty) {
-      system
-        ..writeln()
-        ..writeln()
-        ..writeln('Messages $me really sent $them (about other things):')
-        ..write(
-          voiceSample.map((m) => '- ${m.replaceAll('\n', ' / ')}').join('\n'),
-        );
-    }
-    system
-      ..writeln()
-      ..writeln()
-      ..write(
-        'Answer only with JSON: {"score": <0-10, 10 = exactly how $me writes>, '
-        '"verdict": "<a few words>", "notes": ["<what gives it away, or what '
-        'is spot on, quoting the words; at most 4>"]}. Notes in English, '
-        'quotes as written.',
-      );
-    final raw = await openai.chat(
-      model: settings.generationModel,
-      messages: [
-        {'role': 'system', 'content': system.toString()},
-        {'role': 'user', 'content': draft.trim()},
-      ],
-      jsonMode: true,
-      temperature: 0,
-    );
-    return StyleVerdict.parse(raw);
-  }
-
   /// Rewrites one suggestion according to [refinement], keeping what it is
   /// for: a topic change stays a topic change.
   Future<ReplySuggestion> refine({
@@ -388,9 +299,6 @@ class ReplyGenerator {
     StyleProfile profile = StyleProfile.empty,
     List<String> voiceSample = const [],
     bool group = false,
-    List<String> facts = const [],
-    List<String> styleGuide = const [],
-    List<String> acting = const [],
   }) async {
     final me = _name(settings.myName, 'the user');
     final messages = buildMessages(
@@ -402,9 +310,6 @@ class ReplyGenerator {
       voiceSample: voiceSample,
       newTopic: suggestion.isNewTopic,
       group: group,
-      facts: facts,
-      styleGuide: styleGuide,
-      acting: acting,
       extra:
           'You had drafted this as your next message:\n'
           '${suggestion.text}\n\n'
@@ -444,9 +349,6 @@ class ReplyGenerator {
     List<String> voiceSample = const [],
     bool newTopic = false,
     bool group = false,
-    List<String> facts = const [],
-    List<String> styleGuide = const [],
-    List<String> acting = const [],
     String? extra,
   }) {
     final me = settings.myName;
@@ -465,9 +367,6 @@ class ReplyGenerator {
           hasExamples: examples.isNotEmpty,
           group: group,
           earlier: earlier,
-          facts: facts,
-          styleGuide: styleGuide,
-          acting: acting,
           extra: extra,
         ),
       },
@@ -559,9 +458,6 @@ class ReplyGenerator {
     bool hasExamples = true,
     bool group = false,
     List<ChatTurn> earlier = const [],
-    List<String> facts = const [],
-    List<String> styleGuide = const [],
-    List<String> acting = const [],
     String? extra,
     String? earlierIntro,
   }) {
@@ -611,30 +507,6 @@ class ReplyGenerator {
         '${earlierIntro ?? "Earlier in this same conversation, before the "
                 "part in the last user message (background only — what $me "
                 "writes answers the latest messages):"}\n$background',
-      );
-    }
-
-    if (facts.isNotEmpty) {
-      section(
-        'Things $me knows about $them from their chats, to call back to only '
-        'when one fits what is being said (never list them, never force one '
-        'in):\n${facts.map((f) => '- $f').join('\n')}',
-      );
-    }
-
-    if (styleGuide.isNotEmpty) {
-      section(
-        'How $me writes to $them, as studied from their whole chat (follow '
-        'it closely; it is $me\'s voice):\n'
-        '${styleGuide.map((l) => '- $l').join('\n')}',
-      );
-    }
-
-    if (acting.isNotEmpty) {
-      section(
-        'How $me acts with $them, as studied from their whole chat (this '
-        'decides how the message reacts, not just how it is worded):\n'
-        '${acting.map((l) => '- $l').join('\n')}',
       );
     }
 
@@ -731,50 +603,5 @@ class ReplyGenerator {
       }
     }
     return out.trim();
-  }
-}
-
-/// A model's judgement of whether a message sounds like you.
-class StyleVerdict {
-  const StyleVerdict({
-    required this.score,
-    required this.verdict,
-    this.notes = const [],
-  });
-
-  /// 0 to 10; 10 is exactly how you write.
-  final int score;
-  final String verdict;
-  final List<String> notes;
-
-  static StyleVerdict parse(String raw) {
-    final start = raw.indexOf('{');
-    final end = raw.lastIndexOf('}');
-    Object? json;
-    if (start >= 0 && end > start) {
-      try {
-        json = jsonDecode(raw.substring(start, end + 1));
-      } on FormatException {
-        json = null;
-      }
-    }
-    if (json is! Map) {
-      throw const OpenAiException(
-        OpenAiErrorKind.badResponse,
-        "Couldn't read the judgement. Try again.",
-      );
-    }
-    final score = json['score'];
-    final verdict = json['verdict'];
-    final notes = json['notes'];
-    return StyleVerdict(
-      score: score is num ? score.round().clamp(0, 10) : 0,
-      verdict: verdict is String ? verdict.trim() : '',
-      notes: [
-        if (notes is List)
-          for (final n in notes)
-            if (n is String && n.trim().isNotEmpty) n.trim(),
-      ],
-    );
   }
 }

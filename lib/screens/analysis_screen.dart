@@ -15,9 +15,10 @@ import '../widgets/failure_text.dart';
 import '../widgets/format.dart';
 import '../widgets/paper_ui.dart';
 
-/// What the app has worked out about one chat: how you write in it (used
-/// for every reply to them), how each of you acts, what goes on between
-/// you, and things they've told you worth remembering.
+/// What the app has worked out about one chat: how you write in it, how
+/// each of you acts, what goes on between you, and things they've told you
+/// worth remembering. It is for you to read: replies learn from your real
+/// messages, not from this.
 class AnalysisScreen extends ConsumerStatefulWidget {
   const AnalysisScreen({super.key});
 
@@ -222,9 +223,9 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                 ),
               if (!done && !busy)
                 Text(
-                  'Works out how you write to ${bidiIsolate(them)}, which '
-                  'every reply to them then follows, plus how you both act '
-                  'and what they\'ve told you.',
+                  'Works out how you write to ${bidiIsolate(them)}, how you '
+                  'both act and what they\'ve told you. It\'s for you to '
+                  'read; replies learn from your real messages instead.',
                   style: Type.prose(size: 14, color: Paper.body, height: 1.45),
                 ),
               if (analysis != null && !analysis.isEmpty) ...[
@@ -232,7 +233,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                   _Section(
                     key: const ValueKey('how-you-write'),
                     title: 'How you write',
-                    caption: 'Every reply to ${bidiIsolate(them)} follows this',
                     lines: analysis.writing,
                     highlight: true,
                   ),
@@ -240,7 +240,6 @@ class _AnalysisScreenState extends ConsumerState<AnalysisScreen> {
                   _Section(
                     key: const ValueKey('how-you-act'),
                     title: 'How you act',
-                    caption: 'Replies act like this too',
                     lines: analysis.acting,
                     highlight: true,
                   )
@@ -295,13 +294,11 @@ class _Section extends StatelessWidget {
   const _Section({
     required this.title,
     required this.lines,
-    this.caption,
     this.highlight = false,
     super.key,
   });
 
   final String title;
-  final String? caption;
   final List<String> lines;
   final bool highlight;
 
@@ -317,18 +314,6 @@ class _Section extends StatelessWidget {
             color: highlight ? Paper.onHero : null,
           ),
         ),
-        if (caption != null) ...[
-          const SizedBox(height: 2),
-          Text(
-            caption!,
-            style: Type.prose(
-              size: 12.5,
-              color: highlight
-                  ? Paper.onHero.withValues(alpha: 0.7)
-                  : Paper.muted,
-            ),
-          ),
-        ],
         const SizedBox(height: 6),
         for (final line in lines)
           ContentDirection(

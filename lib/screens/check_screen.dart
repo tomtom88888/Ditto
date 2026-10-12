@@ -3,12 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/app_settings.dart';
 import '../models/stored_exchange.dart';
-import '../services/chat_analysis.dart';
 import '../services/message_check.dart';
-import '../services/reply_generator.dart';
 import '../state/providers.dart';
 import '../theme/tokens.dart';
-import '../widgets/bidi.dart';
 import '../widgets/chat_picker.dart';
 import '../widgets/compose_field.dart';
 import '../widgets/failure_text.dart';
@@ -30,55 +27,12 @@ class _CheckScreenState extends ConsumerState<CheckScreen> {
   bool _busy = false;
   Object? _error;
   List<String> _rewrites = const [];
-  StyleVerdict? _verdict;
-  bool _judging = false;
-
-  /// Each chat's analysis, once looked up.
-  final Map<int, Future<ChatAnalysis?>> _analyses = {};
-
-  Future<ChatAnalysis?> _analysisOf(ChatMemory chat) => _analyses.putIfAbsent(
-    chat.id,
-    () => ref.read(analysisStoreProvider).forChat(chat.id),
-  );
 
   AppSettings _named(AppSettings settings, ChatMemory chat) =>
       settings.copyWith(
         myName: chat.myName.isEmpty ? 'Me' : chat.myName,
         theirName: chat.theirName.isEmpty ? 'Them' : chat.theirName,
       );
-
-  /// Has the writing model judge whether the message sounds like you, from
-  /// how you write to them, your numbers and real messages you sent.
-  Future<void> _judge(ChatMemory chat) async {
-    final generator = ref.read(replyGeneratorProvider);
-    final memory = ref.read(styleMemoryServiceProvider);
-    final text = _draft.text.trim();
-    if (generator == null || memory == null || text.isEmpty) return;
-    FocusScope.of(context).unfocus();
-    setState(() {
-      _judging = true;
-      _error = null;
-    });
-    try {
-      final settings = await ref.read(settingsProvider.future);
-      final verdict = await generator.judgeMine(
-        draft: text,
-        settings: _named(settings, chat),
-        profile: chat.profile,
-        voiceSample: await memory.voiceSample(
-          chatIds: {chat.id},
-          preferChatId: chat.id,
-        ),
-        styleGuide: (await _analysisOf(chat))?.writing ?? const [],
-        acting: (await _analysisOf(chat))?.actingGuide ?? const [],
-      );
-      if (mounted) setState(() => _verdict = verdict);
-    } on Object catch (error) {
-      if (mounted) setState(() => _error = error);
-    } finally {
-      if (mounted) setState(() => _judging = false);
-    }
-  }
 
   @override
   void dispose() {
@@ -100,18 +54,13 @@ class _CheckScreenState extends ConsumerState<CheckScreen> {
       final settings = await ref.read(settingsProvider.future);
       final rewrites = await generator.rewriteMine(
         draft: text,
-        settings: settings.copyWith(
-          myName: chat.myName.isEmpty ? 'Me' : chat.myName,
-          theirName: chat.theirName.isEmpty ? 'Them' : chat.theirName,
-        ),
+        settings: _named(settings, chat),
         profile: chat.profile,
         voiceSample: await memory.voiceSample(
           chatIds: {chat.id},
           preferChatId: chat.id,
         ),
         group: chat.isGroup,
-        styleGuide: (await _analysisOf(chat))?.writing ?? const [],
-        acting: (await _analysisOf(chat))?.actingGuide ?? const [],
       );
       if (mounted) setState(() => _rewrites = rewrites);
     } on Object catch (error) {
@@ -166,7 +115,6 @@ class _CheckScreenState extends ConsumerState<CheckScreen> {
                   onPick: (id) => setState(() {
                     _chatId = id;
                     _rewrites = const [];
-                    _verdict = null;
                   }),
                 ),
               ComposeField(
@@ -176,7 +124,6 @@ class _CheckScreenState extends ConsumerState<CheckScreen> {
                 maxLines: 8,
                 onChanged: (_) => setState(() {
                   _rewrites = const [];
-                  _verdict = null;
                 }),
               ),
               if (check.verdict != CheckVerdict.unknown ||
@@ -186,25 +133,6 @@ class _CheckScreenState extends ConsumerState<CheckScreen> {
                 const MonoLabel('Quick fix · free'),
                 SendableBubble(text: check.quickFix!, app: chat.app),
               ],
-              if (_draft.text.trim().isNotEmpty)
-                FutureBuilder<ChatAnalysis?>(
-                  future: _analysisOf(chat),
-                  builder: (context, guide) => PaperAction(
-                    key: const ValueKey('judge'),
-                    title: 'Is it like me?',
-                    subtitle: !hasKey
-                        ? 'Add an API key in Settings first'
-                        : guide.data?.isEmpty ?? true
-                        ? 'Uses your numbers and messages · analyse the chat '
-                              'for a sharper answer'
-                        : 'Against how you write to ${bidiIsolate(them)}, '
-                              'your numbers and messages',
-                    tone: ActionTone.accent,
-                    busy: _judging,
-                    onTap: hasKey && !_judging ? () => _judge(chat) : null,
-                  ),
-                ),
-              if (_verdict != null) _Judgement(verdict: _verdict!),
               if (_draft.text.trim().isNotEmpty)
                 PaperAction(
                   key: const ValueKey('rewrite'),
@@ -286,59 +214,6 @@ class _Verdict extends StatelessWidget {
                     ),
                   ),
                 ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The model's judgement: a score out of ten, a few words, and what gave it
-/// away.
-class _Judgement extends StatelessWidget {
-  const _Judgement({required this.verdict});
-
-  final StyleVerdict verdict;
-
-  @override
-  Widget build(BuildContext context) {
-    final colour = verdict.score >= 8
-        ? Paper.green
-        : verdict.score >= 5
-        ? Paper.warnText
-        : Paper.errorText;
-    return PaperCard(
-      key: const ValueKey('judgement'),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                '${verdict.score}',
-                style: Type.numeric(size: 30, color: colour),
-              ),
-              Text('/10', style: Type.numeric(size: 14, color: Paper.muted)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  verdict.verdict,
-                  style: Type.strong(size: 15, height: 1.3),
-                ),
-              ),
-            ],
-          ),
-          for (final note in verdict.notes)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                '• $note',
-                textDirection: directionOf(note),
-                style: Type.prose(size: 13.5, color: Paper.body, height: 1.4),
               ),
             ),
         ],

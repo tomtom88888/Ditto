@@ -10,7 +10,6 @@ import 'package:replylikeme/screens/check_screen.dart';
 import 'package:replylikeme/services/chat_analysis.dart';
 import 'package:replylikeme/services/memory_exchange_store.dart';
 import 'package:replylikeme/services/openai_service.dart';
-import 'package:replylikeme/services/reply_generator.dart';
 import 'package:replylikeme/state/providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -102,44 +101,6 @@ void main() {
     });
   });
 
-  group('the style guide', () {
-    test('goes into every reply prompt', () {
-      final prompt = ReplyGenerator.buildSystemPrompt(
-        const AppSettings(myName: 'Robin', theirName: 'Maya'),
-        styleGuide: const ['Mostly two or three words, all lowercase'],
-      );
-      expect(prompt, contains('How Robin writes to Maya'));
-      expect(prompt, contains('- Mostly two or three words, all lowercase'));
-    });
-
-    test('and into the judgement of your own message', () async {
-      final sent = <Map<String, Object?>>[];
-      final verdict =
-          await ReplyGenerator(
-            openai: fake(
-              sent: sent,
-              answer: (_) =>
-                  '{"score": 3, "verdict": "Too formal", '
-                  '"notes": ["\\"I apologise\\" is not you"]}',
-            ),
-          ).judgeMine(
-            draft: 'I apologise for the delay.',
-            settings: const AppSettings(myName: 'Robin', theirName: 'Maya'),
-            profile: robin,
-            voiceSample: const ['haha ok'],
-            styleGuide: const ['Never apologises formally'],
-          );
-      expect(verdict.score, 3);
-      expect(verdict.notes.single, contains('apologise'));
-      final system =
-          ((sent.single['messages']! as List).first as Map)['content']
-              as String;
-      expect(system, contains('- Never apologises formally'));
-      expect(system, contains('Measured from'));
-      expect(system, contains('- haha ok'));
-    });
-  });
-
   group('screens', () {
     Future<MemoryExchangeStore> pump(
       WidgetTester tester,
@@ -189,7 +150,9 @@ void main() {
       expect(saved!.writing, hasLength(2));
     });
 
-    testWidgets('is it like me uses the saved guide', (tester) async {
+    testWidgets('check my message has no "is it like me" any more', (
+      tester,
+    ) async {
       await const AnalysisStore().save(
         1,
         ChatAnalysis(
@@ -201,21 +164,20 @@ void main() {
       await pump(
         tester,
         const CheckScreen(),
-        fake(
-          sent: sent,
-          answer: (_) => '{"score": 9, "verdict": "That\'s you", "notes": []}',
-        ),
+        fake(sent: sent, answer: (_) => 'yalla'),
       );
       await tester.enterText(
         find.byKey(const ValueKey('check-field')),
         'yalla',
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('judge')));
+      expect(find.byKey(const ValueKey('judge')), findsNothing);
+      expect(find.text('Is it like me?'), findsNothing);
+      // The rewrite doesn't read the analysis either.
+      await tester.tap(find.byKey(const ValueKey('rewrite')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('judgement')), findsOneWidget);
-      expect(find.text("That's you"), findsOneWidget);
-      expect(jsonEncode(sent.last), contains('Never apologises formally'));
+      expect(sent, isNotEmpty);
+      expect(jsonEncode(sent.last), isNot(contains('Never apologises')));
     });
   });
 }

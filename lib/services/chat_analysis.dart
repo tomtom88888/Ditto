@@ -22,12 +22,11 @@ class ChatAnalysis {
   final DateTime at;
 
   /// How you write to this person, as instructions another writer could
-  /// follow. Fed to every reply written to them.
+  /// follow.
   final List<String> writing;
 
   /// How you behave with this person, as instructions another writer could
-  /// follow: what you react to and how, initiative, interest, humour. Fed to
-  /// every reply written to them, next to [writing].
+  /// follow: what you react to and how, initiative, interest, humour.
   final List<String> acting;
 
   /// How you act in the chat, as observations. Older analyses have only

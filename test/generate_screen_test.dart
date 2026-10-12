@@ -14,6 +14,7 @@ import 'package:replylikeme/models/reply_suggestion.dart';
 import 'package:replylikeme/models/stored_exchange.dart';
 import 'package:replylikeme/models/style_profile.dart';
 import 'package:replylikeme/screens/generate_screen.dart';
+import 'package:replylikeme/services/chat_analysis.dart';
 import 'package:replylikeme/services/chat_facts.dart';
 import 'package:replylikeme/services/memory_exchange_store.dart';
 import 'package:replylikeme/services/openai_service.dart';
@@ -286,9 +287,7 @@ void main() {
     );
   });
 
-  testWidgets('what is remembered about them goes to the writer', (
-    tester,
-  ) async {
+  testWidgets('nothing from Analysis reaches the writer', (tester) async {
     await const FactsStore().save(
       1,
       SavedFacts(
@@ -298,13 +297,20 @@ void main() {
         ],
       ),
     );
+    await const AnalysisStore().save(
+      1,
+      ChatAnalysis(
+        at: DateTime(2026, 9, 1),
+        writing: const ['Never apologises formally'],
+        acting: const ['Rarely asks back'],
+      ),
+    );
     await pump(tester);
     await pasteAndWrite(tester);
-    final system =
-        ((chatBodies.first['messages']! as List).first as Map)['content']
-            as String;
-    expect(system, contains('Things Robin knows about Sam'));
-    expect(system, contains('- Has a dog called Biscuit'));
+    final request = jsonEncode(chatBodies);
+    expect(request, isNot(contains('Biscuit')));
+    expect(request, isNot(contains('Never apologises')));
+    expect(request, isNot(contains('Rarely asks back')));
   });
 
   testWidgets('a split reply is copied one bubble at a time', (tester) async {

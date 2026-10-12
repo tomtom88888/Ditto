@@ -274,7 +274,6 @@ void main() {
           settings: const AppSettings(myName: 'Robin', theirName: 'Maya'),
           recent: [turn('Maya', 'exam on friday, wish me luck')],
           profile: robin,
-          facts: const ['Has an exam on Friday'],
           quietFor: '5 days',
         );
         expect(out, contains('how did the exam go'));
@@ -283,7 +282,6 @@ void main() {
                 as String;
         expect(system, contains('gone quiet for 5 days'));
         expect(system, contains('exam on friday, wish me luck'));
-        expect(system, contains('Has an exam on Friday'));
       },
     );
 
