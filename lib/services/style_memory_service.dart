@@ -310,6 +310,7 @@ class StyleMemoryService {
   /// Up to [limit] past exchanges like the conversation so far, drawn from
   /// [chatIds] (every chat when omitted), leaning towards
   /// [preferChatId]. Only the last [queryTurns] turns are searched with.
+  /// Exchanges [exclude] picks out are never used.
   Future<RetrievedExamples> retrieve({
     required List<ChatTurn> context,
     required String embeddingModel,
@@ -318,6 +319,7 @@ class StyleMemoryService {
     Set<int>? chatIds,
     int? preferChatId,
     int? queryTurns,
+    bool Function(StoredExchange exchange)? exclude,
   }) async {
     final chats = await store.chats();
     final wanted = chats.where(
@@ -348,7 +350,13 @@ class StyleMemoryService {
       return RetrievedExamples(examples: const [], skipped: skipped);
     }
 
-    final candidates = await store.all(chatIds: usable);
+    final stored = await store.all(chatIds: usable);
+    final candidates = exclude == null
+        ? stored
+        : [
+            for (final e in stored)
+              if (!exclude(e)) e,
+          ];
     if (candidates.isEmpty) {
       return RetrievedExamples(examples: const [], skipped: skipped);
     }
@@ -374,11 +382,13 @@ class StyleMemoryService {
   ///
   /// Two thirds come from [preferChatId] when given (the chat being replied
   /// in), the rest from the other ticked chats. Long replies are skipped:
-  /// they are rare, and the retrieved examples already show those.
+  /// they are rare, and the retrieved examples already show those. Replies
+  /// [exclude] picks out are never used.
   Future<List<String>> voiceSample({
     required Set<int> chatIds,
     int? preferChatId,
     int count = 25,
+    bool Function(StoredExchange exchange)? exclude,
   }) async {
     if (chatIds.isEmpty || count < 1) return const [];
     final rows = await store.all(chatIds: chatIds);
@@ -394,6 +404,7 @@ class StyleMemoryService {
     final preferred = <String>[];
     final others = <String>[];
     for (final row in ordered) {
+      if (exclude?.call(row) ?? false) continue;
       final reply = row.replyText.trim();
       if (reply.isEmpty || reply.length > 160) continue;
       if (!seen.add(reply.toLowerCase())) continue;

@@ -574,6 +574,43 @@ void main() {
       );
       expect(await service.voiceSample(chatIds: {}), isEmpty);
     });
+
+    test('leaves out what it is told to', () async {
+      final service = StyleMemoryService(
+        openai: embedderThat((input) => [1, 0]),
+        store: FakeStore(
+          chats: [samChat()],
+          rows: [reply(1, 'secret', 1), reply(1, 'other', 2)],
+        ),
+      );
+      final sample = await service.voiceSample(
+        chatIds: {1},
+        exclude: (e) => e.replyText == 'secret',
+      );
+      expect(sample, ['other']);
+    });
+  });
+
+  test('retrieve leaves out what it is told to', () async {
+    final service = StyleMemoryService(
+      openai: embedderThat((input) => [1, 0]),
+      store: FakeStore(),
+    );
+    await service.build(
+      exchanges: [exchange('pub?', 'secret'), exchange('pub!', 'other')],
+      myName: 'Robin',
+      theirName: 'Sam',
+      embeddingModel: 'text-embedding-3-small',
+      dimensions: 2,
+    );
+    final hits = (await service.retrieve(
+      context: [turn('Sam', 'pub')],
+      embeddingModel: 'text-embedding-3-small',
+      dimensions: 2,
+      limit: 5,
+      exclude: (e) => e.replyText == 'secret',
+    )).examples;
+    expect(hits.map((h) => h.exchange.replyText), ['other']);
   });
 
   group('estimate', () {
