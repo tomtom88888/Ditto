@@ -23,9 +23,10 @@ AI provider you choose (OpenAI, Claude or Gemini), made with your own key.
 - **Analysis.** Per chat, a model reads a sample of the whole history and
   writes **How you write** (how your texts look and sound, with your own
   phrases quoted) and **How you act** (how keen you come across, who asks
-  back, how you tease, flirt and handle plans). Every reply, tweak, opener
-  and rewrite for them follows both. Alongside: how they act, what goes on
-  between you, and things they've told you worth remembering.
+  back, how you tease, flirt and handle plans). Alongside: how they act,
+  what goes on between you, and things they've told you worth remembering.
+  It's for you to read: replies learn from your real messages, not from
+  this.
 - **Search.** Find a moment by describing it in your own words ("that place
   she wanted to go"). One embedding call; the ranking happens on the phone,
   using a tight fingerprint of each moment, keyword scoring (BM25), and only
@@ -33,12 +34,10 @@ AI provider you choose (OpenAI, Claude or Gemini), made with your own key.
 - **Ask your chats.** Ask a question ("when did we first talk about
   moving?") and get a short answer citing the moments it came from.
 - **Start a chat.** When a chat has gone quiet, openers in your voice that
-  follow up on how it ended and what you know about them.
+  follow up on how it ended.
 - **Check my message.** Paste a message you wrote: it's compared with how
   you usually text that person (length, capitals, full stops, emoji,
-  questions, bubbles), with a free quick fix. **Is it like me?** has the
-  model score it against your How you write guide, your numbers and real
-  messages; the rewrite follows the guide too.
+  questions, bubbles), with a free quick fix, or a rewrite in your voice.
 - **Make a graph.** Describe a chart ("messages per month, me vs her",
   "what time of day we text", "how often we say love") and get it. Only the
   description is sent; the model picks what to count, and the numbers are
@@ -137,15 +136,16 @@ your chat with that person (or all your chats, if you turn on **Also learn
 from my other chats** in the *Replying to* sheet, or reply to *Someone
 else*). Retrieval takes a shortlist by similarity, then picks varied
 examples, nudged towards recent ones. Those real exchanges go into the
-request as reference moments, closest last: they show how you act and sound,
-and the model is told never to mention or continue anything from them, since
-they come from other conversations. The model is told it *is* you texting
-that person and should act like you, not just write like you, with your
-measured habits, a sample of your messages (also reference only), your How
-you write and How you act guides, facts from Analysis, and your note ("say
-I'll be late"). Several drafts come back in one request; each is held to your habits
-where the numbers are clear (no capitals you never use, no emoji if you send
-none) and the most typical are kept.
+request as genuine turns, closest last: their side as the other person's
+message, your actual reply as the model's own. The model isn't asked to
+imitate you; it's put in your place, and the next message continues in
+your voice. It also gets your measured habits, a sample of your messages and
+your note ("say I'll be late"), but not the Analysis guides: being told
+about you invites an impression of you. Several drafts come back in one
+request; each is held to your habits where the numbers are clear (no
+capitals you never use, no emoji if you send none). A draft that brings in a
+name, place or time only the examples had is set aside, since those come
+from other conversations. The most typical of the rest are kept.
 
 **Fine-tuning (optional, OpenAI only, costs money).** The same exchanges can
 be uploaded as JSONL to train a model; the app shows the cost and asks you to
@@ -219,7 +219,7 @@ app stored, optionally including the keys.
 git clone https://github.com/tomtom88888/ChatingTools.git
 cd ChatingTools
 flutter pub get
-flutter test          # 376 tests, no network or device needed
+flutter test          # 385 tests, no network or device needed
 flutter run
 ```
 
@@ -292,7 +292,7 @@ lib/
   theme/                     palettes, type, and per-app bubble colours
   widgets/                   shared UI kit, export guides, job cards, tray
 android/.../MainActivity.kt  keeps the Flutter engine beyond the screen
-test/                        376 unit and widget tests
+test/                        385 unit and widget tests
 test/fixtures/               invented Android and iOS exports
 docs/business-plan.txt       backlog: how it could be sold one day
 ```
@@ -303,7 +303,7 @@ docs/business-plan.txt       backlog: how it could be sold one day
 flutter test
 ```
 
-376 tests, none needing a network or device. They cover both parsers
+385 tests, none needing a network or device. They cover both parsers
 (including Instagram's encoding repair and multi-file threads), the
 OpenAI/Claude/Gemini request and response shapes, error mapping, retries and
 resuming after the app was away, retrieval and the vector maths, prompt
