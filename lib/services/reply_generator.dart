@@ -25,14 +25,22 @@ enum Refinement {
   String instruction(String me) => switch (this) {
     shorter =>
       'Make it shorter — cut it down to what $me would actually bother to '
-          'type, keeping the meaning.',
+          'type, keeping the meaning and the attitude. If it was making a '
+          'point or a joke, keep the sharpest part, not the safest.',
     warmer =>
       'Make it warmer and friendlier, the way $me is when they are in a good '
-          'mood with this person. Do not make it longer than it needs to be.',
+          'mood with this person — in $me\'s own way, not by apologising, '
+          'reassuring or adding sweet words $me would not use. Do not make '
+          'it longer than it needs to be.',
     moreLikeMe =>
       'It does not sound enough like $me. Rewrite it to match the examples '
           'and the measured habits more closely — their length, casing, '
-          'punctuation, slang and emoji — even if that makes it rougher.',
+          'punctuation, slang and emoji — even if that makes it rougher. '
+          'Match how $me comes across too: if $me would argue, tease back, '
+          'exaggerate or push the point, do that rather than soften, agree '
+          'or apologise; if $me would ask again about something left '
+          'unanswered, ask. Drop anything tidier, nicer or more generic '
+          'than $me, and any detail the chat does not support.',
   };
 }
 
@@ -238,10 +246,14 @@ class ReplyGenerator {
           '${quietFor.isEmpty ? "" : " for $quietFor"}. Write one message $me '
           'could send to start it up again with $them. Make it easy to '
           'answer and specific to the two of them: follow up on something '
-          'from the end of the chat, or '
-          'open something new they would enjoy. Open the way $me really '
-          'does, with $me\'s usual energy. No "hey stranger", no '
-          'apologising for the silence unless $me would.',
+          'from the end of the chat, pick up a question that was left '
+          'unanswered, or open something new they would enjoy, with a real, '
+          'specific detail rather than a general "how are you". Open the way '
+          '$me really does, with $me\'s usual energy and attitude — if $me '
+          'teases $them, tease. Never claim $me did, saw or planned '
+          'something the chat does not show. No "hey stranger", no '
+          'apologising for the silence and no being extra nice to make up '
+          'for it, unless $me would.',
     );
     final drafts = await _bestDrafts(
       [
@@ -279,7 +291,9 @@ class ReplyGenerator {
           'it to sound like them. Rewrite it so it says the same thing, '
           'with nothing added or left out, in exactly the way $me writes '
           'and comes across: tone, energy, length, casing, punctuation, '
-          'slang, emoji and bubbles. Send only the rewritten message.',
+          'slang, emoji and bubbles. Keep its attitude: do not soften an '
+          'argument, add an apology or reassurance, tidy it up or add a '
+          'flourish $me would not. Send only the rewritten message.',
     );
     return _bestDrafts(
       [
@@ -550,7 +564,9 @@ class ReplyGenerator {
             : 'For this next message, do not answer what $them just said. '
                   'Move the conversation on to something else, the way $me '
                   'would change the subject with $them — still sounding like '
-                  '$me, and still fitting where the chat has got to.',
+                  '$me, and still fitting where the chat has got to. Bring '
+                  'something specific, with $me\'s energy, not a vague '
+                  'question, and never make up something $me did or saw.',
       );
     }
     section(extra ?? '');

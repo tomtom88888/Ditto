@@ -8,14 +8,13 @@ import 'package:replylikeme/services/leak_guard.dart';
 ChatTurn turn(String sender, String text) =>
     ChatTurn(sender: sender, text: text, messageCount: 1);
 
-StoredExchange exchange(List<ChatTurn> context, String reply) =>
-    StoredExchange(
-      id: 1,
-      context: context,
-      contextText: '',
-      replyText: reply,
-      vector: Float32List(2),
-    );
+StoredExchange exchange(List<ChatTurn> context, String reply) => StoredExchange(
+  id: 1,
+  context: context,
+  contextText: '',
+  replyText: reply,
+  vector: Float32List(2),
+);
 
 void main() {
   group('risky', () {
