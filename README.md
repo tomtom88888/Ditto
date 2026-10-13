@@ -62,6 +62,8 @@ AI provider you choose (OpenAI, Claude or Gemini), made with your own key.
   read what gave each away, and take on a better prompt in one tap. **Spot
   the real one** lets you guess too; **Copy results** shares the scores,
   with or without the chat lines.
+  Switch to **Openers** to test conversation starters the same way, on
+  real times you started the chat again after 12+ hours of quiet.
 
 Long jobs (importing, Analysis, groupings, blind tests) run in the background with a
 progress tray at the bottom of every screen. You can leave the screen or
@@ -165,6 +167,15 @@ know you by, and the two messages in a random order. The same moments are
 used until you ask for new ones, so prompts and versions can be compared;
 two scores are called clearly different only when a two-proportion test
 puts the gap beyond luck (p < 0.1).
+
+The openers test is kept fair the same way. Its moments are real messages
+you sent after at least 12 hours of quiet. The writer gets what you would
+give the app: how the chat ended, how long it was quiet, and a plain
+one-line note of what you brought up (written by the model with none of your
+words, standing in for "what happened in your day"), plus the past moments
+that note finds. Anything within 12 hours of the opener, or quoting it, is
+kept out. The judge is told the writer knew what you brought up, so it
+judges how it was said rather than what.
 
 **Fine-tuning (optional, OpenAI only, costs money).** The same exchanges can
 be uploaded as JSONL to train a model; the app shows the cost and asks you to

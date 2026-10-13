@@ -1,5 +1,15 @@
 import 'chat_turn.dart';
 
+/// What a blind test writes in your place: replies to what was just said,
+/// or messages to start a quiet chat up again.
+enum BlindKind {
+  replies,
+  openers;
+
+  static BlindKind from(Object? name) =>
+      name == openers.name ? openers : replies;
+}
+
 /// A prompt under test: what it is called on screen, and its text.
 class BlindPrompt {
   const BlindPrompt({required this.label, required this.text});
@@ -38,9 +48,14 @@ class BlindPair {
     this.judgePick,
     this.why = '',
     this.userPick,
+    this.setup = '',
   });
 
   final List<ChatTurn> context;
+
+  /// What else the moment was, shown between the chat and the two messages:
+  /// for an opener, how long it had been quiet and what you brought up.
+  final String setup;
   final String real;
   final String generated;
   final bool realIsA;
@@ -71,6 +86,7 @@ class BlindPair {
     judgePick: judgePick,
     why: why,
     userPick: pick,
+    setup: setup,
   );
 
   Map<String, Object?> toJson() => {
@@ -81,6 +97,7 @@ class BlindPair {
     'judgePick': judgePick,
     'why': why,
     'userPick': userPick,
+    if (setup.isNotEmpty) 'setup': setup,
   };
 
   static BlindPair? fromJson(Object? json) {
@@ -104,6 +121,7 @@ class BlindPair {
       judgePick: pick(json['judgePick']),
       why: json['why'] is String ? json['why'] as String : '',
       userPick: pick(json['userPick']),
+      setup: json['setup'] is String ? json['setup'] as String : '',
     );
   }
 }
@@ -161,8 +179,10 @@ class BlindRun {
     required this.replyModel,
     required this.promptVersion,
     required this.results,
+    this.kind = BlindKind.replies,
   });
 
+  final BlindKind kind;
   final DateTime at;
   final String replyModel;
 
@@ -183,10 +203,12 @@ class BlindRun {
     replyModel: replyModel,
     promptVersion: promptVersion,
     results: next,
+    kind: kind,
   );
 
   Map<String, Object?> toJson() => {
     'at': at.millisecondsSinceEpoch,
+    'kind': kind.name,
     'replyModel': replyModel,
     'promptVersion': promptVersion,
     'results': [for (final r in results) r.toJson()],
@@ -204,6 +226,7 @@ class BlindRun {
           : '',
       promptVersion: (json['promptVersion'] as num?)?.toInt() ?? 0,
       results: [for (final r in results) ?BlindPromptResult.fromJson(r)],
+      kind: BlindKind.from(json['kind']),
     );
   }
 }
@@ -226,8 +249,15 @@ class BlindTestState {
   /// Newest first.
   final List<BlindRun> runs;
 
-  /// The most runs kept per chat; each holds every moment's messages.
+  /// The most runs kept per chat of each kind; each holds every moment's
+  /// messages.
   static const int maxRuns = 10;
+
+  /// The runs of [kind], newest first.
+  List<BlindRun> runsOf(BlindKind kind) => [
+    for (final r in runs)
+      if (r.kind == kind) r,
+  ];
 
   BlindTestState copyWith({int? seed, String? tryThis, List<BlindRun>? runs}) =>
       BlindTestState(
@@ -236,9 +266,16 @@ class BlindTestState {
         runs: runs ?? this.runs,
       );
 
-  /// With [run] added as the newest.
-  BlindTestState adding(BlindRun run) =>
-      copyWith(runs: [run, ...runs].take(maxRuns).toList());
+  /// With [run] added as the newest, keeping [maxRuns] of its kind.
+  BlindTestState adding(BlindRun run) {
+    var same = 0;
+    return copyWith(
+      runs: [
+        for (final r in [run, ...runs])
+          if (r.kind != run.kind || ++same <= maxRuns) r,
+      ],
+    );
+  }
 
   Map<String, Object?> toJson() => {
     'seed': seed,

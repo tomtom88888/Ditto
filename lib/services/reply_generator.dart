@@ -99,6 +99,20 @@ class ReplyGenerator {
     return turns;
   }
 
+  /// Past moments with them, found from your day, that an opener may call
+  /// back to.
+  static const int relatedCount = 4;
+
+  /// How long a chat has been quiet, in words: "3 days", "2 weeks",
+  /// "4 months", or empty under a day.
+  static String quietFor(Duration quiet) {
+    final days = quiet.inDays;
+    if (days < 1) return '';
+    if (days < 14) return '$days ${days == 1 ? "day" : "days"}';
+    if (days < 60) return '${days ~/ 7} weeks';
+    return '${days ~/ 30} months';
+  }
+
   /// How many drafts are written for each reply that is kept.
   static const int draftsPerReply = 2;
 

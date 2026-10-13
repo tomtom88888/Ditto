@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/app_settings.dart';
 import '../models/stored_exchange.dart';
+import '../services/reply_generator.dart';
 import '../state/providers.dart';
 import '../theme/tokens.dart';
 import '../widgets/chat_picker.dart';
@@ -37,18 +38,10 @@ class _OpenersScreenState extends ConsumerState<OpenersScreen> {
     super.dispose();
   }
 
-  /// Past moments with them about something like your day.
-  static const int relatedCount = 4;
-
   /// "3 days", "2 weeks", "4 months", or empty when unknown or recent.
-  static String quietFor(DateTime? last, [DateTime? now]) {
-    if (last == null) return '';
-    final days = (now ?? DateTime.now()).difference(last).inDays;
-    if (days < 1) return '';
-    if (days < 14) return '$days ${days == 1 ? "day" : "days"}';
-    if (days < 60) return '${days ~/ 7} weeks';
-    return '${days ~/ 30} months';
-  }
+  static String quietFor(DateTime? last, [DateTime? now]) => last == null
+      ? ''
+      : ReplyGenerator.quietFor((now ?? DateTime.now()).difference(last));
 
   Future<void> _suggest(ChatMemory chat) async {
     final generator = ref.read(replyGeneratorProvider);
@@ -76,7 +69,7 @@ class _OpenersScreenState extends ConsumerState<OpenersScreen> {
                 chatIds: {chat.id},
                 embeddingModel: settings.embeddingModel,
                 dimensions: settings.embeddingDimensions,
-                count: relatedCount,
+                count: ReplyGenerator.relatedCount,
               ))
                 hit.exchange,
             ];

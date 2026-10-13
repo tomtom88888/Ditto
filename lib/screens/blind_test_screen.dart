@@ -39,6 +39,7 @@ class _BlindTestScreenState extends ConsumerState<BlindTestScreen> {
   BlindTestState? _state;
   bool _useYours = true;
   bool _useTry = false;
+  BlindKind _kind = BlindKind.replies;
 
   /// Which prompts' misses are open.
   final Set<String> _open = {};
@@ -112,21 +113,32 @@ class _BlindTestScreenState extends ConsumerState<BlindTestScreen> {
         .read(taskCenterProvider.notifier)
         .start(
           id: BlindTestScreen.taskId(chat),
-          title: 'Blind test with $them',
+          title: _kind == BlindKind.openers
+              ? 'Opener blind test with $them'
+              : 'Blind test with $them',
           detail: 'Picking moments',
           work: (task) async {
-            final run = await tester.run(
-              chat: chat,
-              settings: named,
-              prompts: prompts,
-              seed: state.seed,
-              onProgress: (done, of) => task
-                ..check()
-                ..report(
-                  detail: 'Moment ${math.min(done + 1, of)} of $of',
-                  progress: of == 0 ? null : done / of,
-                ),
-            );
+            void progress(int done, int of) => task
+              ..check()
+              ..report(
+                detail: 'Moment ${math.min(done + 1, of)} of $of',
+                progress: of == 0 ? null : done / of,
+              );
+            final run = _kind == BlindKind.openers
+                ? await tester.runOpeners(
+                    chat: chat,
+                    settings: named,
+                    prompts: prompts,
+                    seed: state.seed,
+                    onProgress: progress,
+                  )
+                : await tester.run(
+                    chat: chat,
+                    settings: named,
+                    prompts: prompts,
+                    seed: state.seed,
+                    onProgress: progress,
+                  );
             task.check();
             final current =
                 await store.forChat(chat.id) ??
@@ -185,14 +197,15 @@ class _BlindTestScreenState extends ConsumerState<BlindTestScreen> {
   Future<void> _pick(String side) async {
     final state = _state;
     final at = _playing;
-    if (state == null || state.runs.isEmpty || at == null) return;
-    final run = state.runs.first;
+    final run = state?.runsOf(_kind).firstOrNull;
+    if (state == null || run == null || at == null) return;
     final (r, p) = at;
     final result = run.results[r];
     final pairs = [...result.pairs]..[p] = result.pairs[p].withUserPick(side);
     final results = [...run.results]..[r] = result.withPairs(pairs);
+    final index = state.runs.indexOf(run);
     final next = state.copyWith(
-      runs: [run.withResults(results), ...state.runs.skip(1)],
+      runs: [...state.runs]..[index] = run.withResults(results),
     );
     setState(() => _playing = _after(results, r, p));
     await _save(next);
@@ -227,14 +240,15 @@ class _BlindTestScreenState extends ConsumerState<BlindTestScreen> {
     });
 
     final state = _state;
-    final latest = state == null || state.runs.isEmpty
-        ? null
-        : state.runs.first;
+    final runs = state?.runsOf(_kind) ?? const <BlindRun>[];
+    final latest = runs.firstOrNull;
     final prompts = _prompts(settings);
     final calls = BlindTest.calls(
       moments: BlindTest.momentCount,
       prompts: prompts.length,
+      kind: _kind,
     );
+    final openers = _kind == BlindKind.openers;
 
     return PaperScreen(
       children: [
@@ -248,11 +262,24 @@ class _BlindTestScreenState extends ConsumerState<BlindTestScreen> {
           trailing: ' know?',
           size: 32,
         ),
+        _KindPicker(
+          kind: _kind,
+          onPick: busy || _playing != null
+              ? null
+              : (kind) => setState(() => _kind = kind),
+        ),
         Text(
-          'Takes ${BlindTest.momentCount} real moments from this chat, hides '
-          'what you replied, and writes a reply in your place. A judge then '
-          'sees both and guesses which one you sent. Passing as you about '
-          'half the time means it couldn\'t tell.',
+          openers
+              ? 'Takes ${BlindTest.momentCount} times you started this chat '
+                    'again after ${BlindTest.minQuiet.inHours}+ hours of '
+                    'quiet, and writes an opener in your place, told what '
+                    'you brought up but none of your words. A judge then '
+                    'guesses which one you sent.'
+              : 'Takes ${BlindTest.momentCount} real moments from this chat, '
+                    'hides what you replied, and writes a reply in your '
+                    'place. A judge then sees both and guesses which one you '
+                    'sent. Passing as you about half the time means it '
+                    'couldn\'t tell.',
           style: Type.prose(size: 14, color: Paper.body, height: 1.45),
         ),
         if (state == null) const LinearProgressIndicator(minHeight: 3),
@@ -365,14 +392,14 @@ class _BlindTestScreenState extends ConsumerState<BlindTestScreen> {
               onTap: () => _copy(latest),
             ),
           ],
-          if (state != null && state.runs.length > 1) ...[
+          if (runs.length > 1) ...[
             const MonoLabel('Earlier runs'),
             PaperCard(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final run in state.runs.skip(1))
+                  for (final run in runs.skip(1))
                     FigureRow(
                       '${dayMonthTime(run.at)} · v${run.promptVersion}',
                       run.results
@@ -395,6 +422,55 @@ class _BlindTestScreenState extends ConsumerState<BlindTestScreen> {
       ],
     );
   }
+}
+
+/// Replies or openers: which the test writes.
+class _KindPicker extends StatelessWidget {
+  const _KindPicker({required this.kind, this.onPick});
+
+  final BlindKind kind;
+  final ValueChanged<BlindKind>? onPick;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      for (final (k, label) in [
+        (BlindKind.replies, 'Replies'),
+        (BlindKind.openers, 'Openers'),
+      ]) ...[
+        if (k != BlindKind.replies) const SizedBox(width: 8),
+        Expanded(
+          child: Semantics(
+            selected: k == kind,
+            button: true,
+            child: InkWell(
+              key: ValueKey('kind-${k.name}'),
+              borderRadius: Corner.all(Corner.pill),
+              onTap: onPick == null ? null : () => onPick!(k),
+              child: Container(
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: k == kind ? Paper.accent : Paper.card,
+                  borderRadius: Corner.all(Corner.pill),
+                  border: Border.all(
+                    color: k == kind ? Paper.accent : Paper.border,
+                  ),
+                ),
+                child: Text(
+                  label,
+                  style: Type.strong(
+                    size: 14,
+                    color: k == kind ? Paper.onAccent : Paper.secondary,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ],
+  );
 }
 
 class _PromptSwitch extends StatelessWidget {
@@ -546,6 +622,11 @@ class _Miss extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (final t in lead) line(t.sender, t.text, color: Paper.muted),
+            if (pair.setup.isNotEmpty)
+              Text(
+                pair.setup,
+                style: Type.prose(size: 12.5, color: Paper.muted, height: 1.4),
+              ),
             const SizedBox(height: 4),
             line('You', pair.real),
             line('Generated', pair.generated),
@@ -599,6 +680,13 @@ class _Play extends StatelessWidget {
                   textDirection: directionOf(t.text),
                   style: Type.prose(size: 14, color: Paper.body, height: 1.4),
                 ),
+              if (pair.setup.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  pair.setup,
+                  style: Type.prose(size: 13, color: Paper.muted, height: 1.4),
+                ),
+              ],
             ],
           ),
         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:replylikeme/models/chat_turn.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:replylikeme/models/ai_provider.dart';
 import 'package:replylikeme/models/app_settings.dart';
@@ -232,6 +233,53 @@ void main() {
     final saved = await const BlindTestStore().forChat(1);
     expect(saved!.runs, hasLength(1));
     expect(find.byKey(const ValueKey('score-Built-in')), findsOneWidget);
+  });
+
+  testWidgets('openers can be tested too, kept apart from replies', (
+    tester,
+  ) async {
+    final start = DateTime(2026, 1, 1, 12);
+    final openai = fake(
+      embed: (_) => [1, 0],
+      answer: (body) => body.containsKey('response_format')
+          ? '{"pick": "B", "why": "x"}'
+          : 'generated',
+    );
+    await pump(
+      tester,
+      openai: openai,
+      rows: [
+        for (var i = 1; i <= 25; i++)
+          StoredExchange(
+            id: i,
+            chatId: 1,
+            context: [
+              ChatTurn(
+                sender: 'Maya',
+                text: 'night $i',
+                messageCount: 1,
+                lastTimestamp: start.add(Duration(days: 2 * i)),
+              ),
+            ],
+            contextText: 'Maya: night $i',
+            replyText: 'morning $i',
+            vector: VectorMath.normalise([1, 0]),
+            timestamp: start.add(Duration(days: 2 * i + 1)),
+          ),
+      ],
+    );
+    await tester.tap(find.byKey(const ValueKey('kind-openers')));
+    await tester.pumpAndSettle();
+    expect(find.text('80 calls · gpt-5.6-terra'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('run')));
+    await tester.pumpAndSettle();
+    final saved = await const BlindTestStore().forChat(1);
+    expect(saved!.runs.single.kind, BlindKind.openers);
+    expect(find.byKey(const ValueKey('score-Built-in')), findsOneWidget);
+    // Replies have no run of their own yet.
+    await tester.tap(find.byKey(const ValueKey('kind-replies')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('score-Built-in')), findsNothing);
   });
 
   testWidgets('home opens the blind test from a chat\'s menu', (tester) async {

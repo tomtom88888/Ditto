@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:replylikeme/models/app_settings.dart';
 import 'package:replylikeme/models/blind_test.dart';
+import 'package:replylikeme/models/chat_turn.dart';
 import 'package:replylikeme/models/stored_exchange.dart';
 import 'package:replylikeme/services/blind_test.dart';
 import 'package:replylikeme/services/blind_test_store.dart';
@@ -34,6 +35,32 @@ StoredExchange moment({
   vector: VectorMath.normalise([1, 0]),
   timestamp: at,
   source: source,
+);
+
+/// A moment where Robin writes [quiet] after Maya's last message, at
+/// [at] plus [quiet].
+StoredExchange opener({
+  required int id,
+  required DateTime at,
+  required Duration quiet,
+  String reply = 'opener',
+  String lead = 'night',
+}) => StoredExchange(
+  id: id,
+  chatId: 1,
+  context: [
+    ChatTurn(
+      sender: 'Maya',
+      text: lead,
+      messageCount: 1,
+      firstTimestamp: at,
+      lastTimestamp: at,
+    ),
+  ],
+  contextText: 'Maya: $lead',
+  replyText: reply,
+  vector: VectorMath.normalise([1, 0]),
+  timestamp: at.add(quiet),
 );
 
 BlindPair pair({
@@ -238,6 +265,169 @@ void main() {
       expect(text, isNot(contains('TRY THIS TEXT')));
       expect(text, isNot(contains('my real reply')));
       expect(text, isNot(contains('pub?')));
+    });
+  });
+
+  group('openers', () {
+    final start = DateTime(2026, 1, 1, 9);
+
+    test('only times you started the chat again after a long quiet', () {
+      final all = [
+        for (var i = 1; i <= 30; i++)
+          opener(
+            id: i,
+            at: start.add(Duration(days: i)),
+            quiet: Duration(hours: i.isEven ? 20 : 2),
+          ),
+      ];
+      final picked = BlindTest.pickOpeners(all, seed: 5);
+      expect(picked, hasLength(15));
+      expect(picked.every((e) => e.id.isEven), isTrue);
+      expect(
+        BlindTest.pickOpeners(all, seed: 5).map((e) => e.id),
+        picked.map((e) => e.id),
+      );
+    });
+
+    test('a later moment quoting the opener is kept from the writer', () {
+      final held = opener(id: 1, at: start, quiet: const Duration(days: 2));
+      final later = opener(
+        id: 40,
+        at: start.add(const Duration(days: 9)),
+        quiet: Duration.zero,
+        lead: 'opener',
+      );
+      final other = opener(
+        id: 41,
+        at: start.add(const Duration(days: 9)),
+        quiet: Duration.zero,
+      );
+      final exclude = BlindTest.excludingOpener(held);
+      expect(exclude(later), isTrue);
+      expect(exclude(other), isFalse);
+    });
+
+    test('the judge knows the writer was told what you brought up', () {
+      final system = BlindTest.judgeSystem(
+        me: 'Robin',
+        them: 'Maya',
+        realReplies: const [],
+        kind: BlindKind.openers,
+      );
+      expect(system, contains('starting the chat up again'));
+      expect(system, contains('told the same'));
+      final user = BlindTest.judgeUser(
+        context: [turn('Maya', 'night')],
+        a: 'x',
+        b: 'y',
+        setup: BlindTest.openerSetup(
+          quiet: const Duration(days: 3),
+          topic: 'got a dog',
+        ),
+      );
+      expect(
+        user,
+        'Maya: night\n(quiet for 3 days · brought up: got a dog)\n\nA: x\nB: y',
+      );
+      expect(
+        BlindTest.calls(moments: 20, prompts: 1, kind: BlindKind.openers),
+        80,
+      );
+    });
+
+    test('a run writes openers without ever seeing the real ones', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final rows = [
+        for (var i = 1; i <= 25; i++)
+          opener(
+            id: i,
+            at: start.add(Duration(days: 2 * i)),
+            quiet: const Duration(days: 1),
+            reply: 'real opener $i',
+          ),
+      ];
+      final sent = <Map<String, Object?>>[];
+      final openai = fake(
+        sent: sent,
+        embed: (_) => [1, 0],
+        answer: (body) {
+          if (body.containsKey('response_format')) {
+            return '{"pick": "B", "why": "too tidy"}';
+          }
+          final system =
+              ((body['messages']! as List).first as Map)['content'] as String;
+          return system.startsWith('You are given a message')
+              ? 'he mentions a topic'
+              : 'generated opener';
+        },
+      );
+      final run =
+          await BlindTester(
+            memory: StyleMemoryService(
+              openai: openai,
+              store: MemoryExchangeStore(chats: [chat()], rows: rows),
+            ),
+            generator: ReplyGenerator(openai: openai),
+            openai: openai,
+          ).runOpeners(
+            chat: chat(),
+            settings: const AppSettings(
+              myName: 'Robin',
+              theirName: 'Maya',
+              embeddingDimensions: 2,
+            ),
+            prompts: const [
+              BlindPrompt(label: BlindPrompt.builtIn, text: 'PROMPT {me}'),
+            ],
+            seed: 2,
+          );
+      expect(run.kind, BlindKind.openers);
+      final pairs = run.results.single.pairs;
+      expect(pairs, hasLength(20));
+      for (final p in pairs) {
+        expect(p.generated, 'generated opener');
+        expect(p.setup, '(quiet for 1 day · brought up: he mentions a topic)');
+        expect(p.judgePick, 'B');
+        expect(p.why, 'too tidy');
+      }
+      final writes = [
+        for (final b in sent)
+          if (b.containsKey('messages') &&
+              !b.containsKey('response_format') &&
+              (((b['messages']! as List).first as Map)['content'] as String)
+                  .startsWith('PROMPT Robin'))
+            b,
+      ];
+      expect(writes, hasLength(20));
+      for (final (i, p) in pairs.indexed) {
+        final held = RegExp('${RegExp.escape(p.real)}(?!\\d)');
+        final mine = writes[i];
+        expect(
+          held.hasMatch(jsonEncode(mine['messages'])),
+          isFalse,
+          reason: 'opener $i',
+        );
+        expect(jsonEncode(mine['messages']), contains('he mentions a topic'));
+      }
+    });
+
+    test('runs of each kind are kept apart', () {
+      var state = const BlindTestState(seed: 1);
+      for (var i = 0; i < 12; i++) {
+        state = state.adding(
+          BlindRun(
+            at: DateTime(2026, 1, i + 1),
+            replyModel: 'm',
+            promptVersion: 2,
+            results: const [],
+            kind: i.isEven ? BlindKind.openers : BlindKind.replies,
+          ),
+        );
+      }
+      expect(state.runsOf(BlindKind.openers), hasLength(6));
+      final back = BlindTestState.fromJson(state.toJson())!;
+      expect(back.runsOf(BlindKind.replies), hasLength(6));
+      expect(back.runs.first.kind, BlindKind.replies);
     });
   });
 
