@@ -24,6 +24,7 @@ class OpenersScreen extends ConsumerStatefulWidget {
 
 class _OpenersScreenState extends ConsumerState<OpenersScreen> {
   final _note = TextEditingController();
+  final _day = TextEditingController();
   late int? _chatId = widget.chat?.id;
   bool _busy = false;
   Object? _error;
@@ -32,8 +33,12 @@ class _OpenersScreenState extends ConsumerState<OpenersScreen> {
   @override
   void dispose() {
     _note.dispose();
+    _day.dispose();
     super.dispose();
   }
+
+  /// Past moments with them about something like your day.
+  static const int relatedCount = 4;
 
   /// "3 days", "2 weeks", "4 months", or empty when unknown or recent.
   static String quietFor(DateTime? last, [DateTime? now]) {
@@ -61,6 +66,20 @@ class _OpenersScreenState extends ConsumerState<OpenersScreen> {
         chatIds: {chat.id},
         preferChatId: chat.id,
       );
+      final day = _day.text.trim();
+      final search = ref.read(chatSearchProvider);
+      final related = day.isEmpty || search == null
+          ? const <StoredExchange>[]
+          : [
+              for (final hit in await search.closest(
+                day,
+                chatIds: {chat.id},
+                embeddingModel: settings.embeddingModel,
+                dimensions: settings.embeddingDimensions,
+                count: relatedCount,
+              ))
+                hit.exchange,
+            ];
       final openers = await generator.openers(
         settings: settings.copyWith(
           myName: chat.myName.isEmpty ? 'Me' : chat.myName,
@@ -72,6 +91,8 @@ class _OpenersScreenState extends ConsumerState<OpenersScreen> {
         note: _note.text,
         quietFor: quietFor(chat.lastMessageAt),
         group: chat.isGroup,
+        day: day,
+        related: related,
       );
       if (mounted) setState(() => _openers = openers);
     } on Object catch (error) {
@@ -135,6 +156,12 @@ class _OpenersScreenState extends ConsumerState<OpenersScreen> {
                   style: Type.prose(size: 14, color: Paper.body),
                 ),
               ComposeField(
+                controller: _day,
+                fieldKey: const ValueKey('opener-day'),
+                hint: 'optional: what happened in your day?',
+                maxLines: 4,
+              ),
+              ComposeField(
                 controller: _note,
                 hint: 'optional: about the trip, ask her out…',
                 maxLines: 3,
@@ -163,8 +190,8 @@ class _OpenersScreenState extends ConsumerState<OpenersScreen> {
           },
         ),
         const Footnote(
-          'Uses the end of your chat, things from Remember, and how you text '
-          'them.',
+          'Uses the end of your chat, your day and past moments about it, and '
+          'how you text them.',
         ),
       ],
     );

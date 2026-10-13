@@ -285,6 +285,32 @@ void main() {
       },
     );
 
+    test('openers can start from your day and past moments about it', () async {
+      final sent = <Map<String, Object?>>[];
+      final generator = ReplyGenerator(
+        openai: fake(sent: sent, answer: (_) => 'guess who got a dog'),
+      );
+      await generator.openers(
+        settings: const AppSettings(myName: 'Robin', theirName: 'Maya'),
+        recent: [turn('Maya', 'night')],
+        profile: robin,
+        day: 'adopted a puppy today',
+        related: [
+          exchange(
+            context: [turn('Maya', 'i want a dog so bad')],
+            reply: 'same honestly',
+            at: DateTime(2026, 3, 4),
+          ),
+        ],
+      );
+      final system =
+          ((sent.last['messages']! as List).first as Map)['content'] as String;
+      expect(system, contains("What happened in Robin's day"));
+      expect(system, contains('adopted a puppy today'));
+      expect(system, contains('[2026-03-04]\nMaya: i want a dog so bad'));
+      expect(system, contains('Me: same honestly'));
+    });
+
     test('rewriteMine sends your message and keeps what it says', () async {
       final sent = <Map<String, Object?>>[];
       final generator = ReplyGenerator(
@@ -366,6 +392,31 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('suggest-openers')));
       await tester.pumpAndSettle();
       expect(find.text('how was the weekend'), findsOneWidget);
+    });
+
+    testWidgets('your day finds past moments to call back to', (tester) async {
+      final sent = <Map<String, Object?>>[];
+      await pump(
+        tester,
+        const OpenersScreen(),
+        store(),
+        fake(sent: sent, embed: (_) => [1, 0], answer: (_) => 'guess what'),
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('opener-day')),
+        'went to the beach',
+      );
+      await tester.tap(find.byKey(const ValueKey('suggest-openers')));
+      await tester.pumpAndSettle();
+      expect(find.text('guess what'), findsOneWidget);
+      final chats = [
+        for (final b in sent)
+          if (b['messages'] is List) b,
+      ];
+      final system =
+          ((chats.last['messages']! as List).first as Map)['content'] as String;
+      expect(system, contains('went to the beach'));
+      expect(system, contains('talked about something like this before'));
     });
 
     testWidgets('the check updates as you type, free', (tester) async {

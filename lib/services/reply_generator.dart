@@ -219,7 +219,9 @@ class ReplyGenerator {
 
   /// Messages to start the chat with [settings.theirName] again after it
   /// went quiet: [count] options in your voice, drawing on the [recent]
-  /// end of the chat, nudged by [note].
+  /// end of the chat, nudged by [note]. With [day], what happened in your
+  /// day in your words, they can start from that; [related] are past
+  /// moments with them about something like it, to call back to.
   Future<List<String>> openers({
     required AppSettings settings,
     required List<ChatTurn> recent,
@@ -229,9 +231,14 @@ class ReplyGenerator {
     String quietFor = '',
     bool group = false,
     int count = 3,
+    String day = '',
+    List<StoredExchange> related = const [],
   }) async {
     final me = _name(settings.myName, 'the user');
     final them = _name(settings.theirName, 'them');
+    final history = [
+      for (final e in related) _pastMoment(e, me: settings.myName),
+    ];
     final system = buildSystemPrompt(
       settings,
       profile: profile,
@@ -253,7 +260,17 @@ class ReplyGenerator {
           'teases $them, tease. Never claim $me did, saw or planned '
           'something the chat does not show. No "hey stranger", no '
           'apologising for the silence and no being extra nice to make up '
-          'for it, unless $me would.',
+          'for it, unless $me would.'
+          '${day.trim().isEmpty ? "" : "\n\nWhat happened in $me's day, in "
+                    "$me's own words:\n${day.trim()}\nStart from this: "
+                    "pick the part $them would care about or react to and "
+                    "tell it the way $me would tell $them — a hook to "
+                    "answer, not a report of the day. Do not add details "
+                    "that are not here."}'
+          '${history.isEmpty ? "" : "\n\nTimes $me and $them talked about "
+                    "something like this before (real history between "
+                    "them; call back to one only if it fits naturally, "
+                    "never list them):\n${history.join('\n\n')}"}',
     );
     final drafts = await _bestDrafts(
       [
@@ -428,6 +445,23 @@ class ReplyGenerator {
             : (named ? '${t.sender}: ${t.text}' : t.text),
       )
       .join('\n');
+
+  /// A past moment with the same person, dated, for calling back to.
+  static String _pastMoment(StoredExchange e, {required String me}) {
+    final at = e.timestamp;
+    final turns = e.context.length > 2
+        ? e.context.sublist(e.context.length - 2)
+        : e.context;
+    String flat(String t) => t.replaceAll('\n', ' / ');
+    return [
+      if (at != null)
+        '[${at.year}-${at.month.toString().padLeft(2, '0')}-'
+            '${at.day.toString().padLeft(2, '0')}]',
+      for (final t in turns)
+        '${t.sender == me ? "Me" : t.sender}: ${flat(t.text)}',
+      'Me: ${flat(e.replyText)}',
+    ].join('\n');
+  }
 
   /// Most of the conversation before the live window that goes in the
   /// prompt as background.

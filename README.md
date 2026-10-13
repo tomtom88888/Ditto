@@ -34,7 +34,9 @@ AI provider you choose (OpenAI, Claude or Gemini), made with your own key.
 - **Ask your chats.** Ask a question ("when did we first talk about
   moving?") and get a short answer citing the moments it came from.
 - **Start a chat.** When a chat has gone quiet, openers in your voice that
-  follow up on how it ended.
+  follow up on how it ended. Say what happened in your day and they can
+  start from that, calling back to past moments with that person about
+  something like it (found by fingerprint, one embedding call).
 - **Check my message.** Paste a message you wrote: it's compared with how
   you usually text that person (length, capitals, full stops, emoji,
   questions, bubbles), with a free quick fix, or a rewrite in your voice.
